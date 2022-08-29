@@ -3317,7 +3317,7 @@ impl JVM {
     pub fn invokedynamic(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
         let pc = thread.m_pc + 1;
-        thread.inc_pc(3)?;
+        thread.inc_pc(5)?; // the 5 is intentional
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
         // Resolve the index into an instance of java.lang.invoke.CallSite.

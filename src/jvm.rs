@@ -224,14 +224,14 @@ impl<'a> JVM {
                 }
             }
             if self.m_crash_info.has_crashed {
-                println!("JVM Crashing due to error {}!", self.m_crash_info.crash_reason);
+                println!("JVM Crashing due to error {}", self.m_crash_info.crash_reason);
                 // TODO: Implement stack unwinding.
                 println!("Stack Trace:");
                 for frame in &access_macros::current_thread_mut!(self).m_stack {
                     let current_class = &frame.rt_const_pool;
                     // TODO: Fix these unwrap calls.
-                    println!("Method name: {}", current_class.cp_entry(frame.current_method.name_index).unwrap());
-                    println!("Method descriptor: {}", current_class.cp_entry(frame.current_method.descriptor_index).unwrap());
+                    println!("Method name: {}, Method descriptor: {}", current_class.cp_entry(frame.current_method.name_index).unwrap().as_utf8().unwrap(),
+                    current_class.cp_entry(frame.current_method.descriptor_index).unwrap().as_utf8().unwrap());
                 }
                 return;
             }

@@ -652,13 +652,13 @@ impl fmt::Display for Code {
         }
         if self.rt_vis_type_annotations.is_some() {
             writeln!(f, "Number of Runtime Invisisble Type Annotation: {}", self.rt_invis_type_annotations.as_ref().unwrap().len())?;
-            writeln!(f, "Runtime Invisisble Type Annotation:")?;
+            write!(f, "Runtime Invisisble Type Annotation:")?;
             for annotation in self.rt_invis_type_annotations.as_ref().unwrap() {
-                writeln!(f, "{:#?}", annotation)?;
+                write!(f, "\n{:#?}", annotation)?;
             }
         }
         else {
-            writeln!(f, "This Code has no Runtime Invisisble Type Annotation Table")?;
+            write!(f, "This Code has no Runtime Invisisble Type Annotation Table")?;
         }
         Ok(())
     }

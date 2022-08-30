@@ -620,7 +620,7 @@ impl<'a>  Class {
                                                     }
                                                     let num_stack = read_u16(data_ptr, &mut location);
                                                     let mut stack = Vec::with_capacity(num_stack as usize);
-                                                    while locals.capacity() > locals.len() {
+                                                    while stack.capacity() > stack.len() {
                                                         stack.push(VerificationTypeInfo::new(data_ptr, &mut location)?);
                                                     }
                                                     StackMapFrame::FullFrame(offset_delta, locals, stack)

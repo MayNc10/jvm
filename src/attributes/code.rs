@@ -327,145 +327,113 @@ impl fmt::Display for Code {
                 151 => writeln!(f, "dcmpl")?,
                 152 => writeln!(f, "dcmpg")?,
                 153 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "ifeq {}", branch)?;
                     code_index += 2;
                 },
                 154 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "ifne {}", branch)?;
                     code_index += 2;
                 },
                 155 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "iflt {}", branch)?;
                     code_index += 2;
                 },
                 156 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "ifge {}", branch)?;
                     code_index += 2;
                 },
                 157 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "ifgt {}", branch)?;
                     code_index += 2;
                 },
                 158 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "ifle {}", branch)?;
                     code_index += 2;
                 },
                 159 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "if_icmpeq {}", branch)?;
                     code_index += 2;
                 },
                 160 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "if_icmpne {}", branch)?;
                     code_index += 2;
                 },
                 161 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "if_icmplt {}", branch)?;
                     code_index += 2;
                 },
                 162 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "if_icmpge {}", branch)?;
                     code_index += 2;
                 },
                 163 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "if_icmpgt {}", branch)?;
                     code_index += 2;
                 },
                 164 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "if_icmple {}", branch)?;
                     code_index += 2;
                 },
                 165 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "if_acmpeq {}", branch)?;
                     code_index += 2;
                 },
                 166 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "if_acmpne {}", branch)?;
                     code_index += 2;
                 },
                 167 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "goto {}", branch)?;
                     code_index += 2;
                 },
                 168 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "jsr {}", branch)?;
                     code_index += 2;
@@ -488,109 +456,85 @@ impl fmt::Display for Code {
                 176 => writeln!(f, "areturn")?,
                 177 => writeln!(f, "return")?,
                 178 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "getstatic #{}", index)?;
                     code_index += 2;
                 },
                 179 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "putstatic #{}", index)?;
                     code_index += 2;
                 },
                 180 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "getfield #{}", index)?;
                     code_index += 2;
                 },
                 181 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "putfield #{}", index)?;
                     code_index += 2;
                 },
                 182 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "invokevirtual #{}", index)?;
                     code_index += 2;
                 },
                 183 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "invokespecial #{}", index)?;
                     code_index += 2;
                 },
                 184 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "invokestatic #{}", index)?;
                     code_index += 2;
                 },
                 185 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "invokeinterface #{}", index)?;
                     code_index += 4;
                 },
                 186 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "invokedynamic #{}", index)?;
                     code_index += 4;
                 },
                 187 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "new #{}", index)?;
                     code_index += 2;
                 },
                 188 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "newarray #{}", index)?;
                     code_index += 2;
                 },
                 189 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "anewarray #{}", index)?;
                     code_index += 2;
@@ -598,19 +542,15 @@ impl fmt::Display for Code {
                 190 => writeln!(f, "arraylength")?,
                 191 => writeln!(f, "athrow")?,
                 192 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "checkcast #{}", index)?;
                     code_index += 2;
                 },
                 193 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "instanceof #{}", index)?;
                     code_index += 2;
@@ -619,29 +559,23 @@ impl fmt::Display for Code {
                 195 => writeln!(f, "monitorexit")?,
                 196 => writeln!(f, "wide")?, // TODO! ADD FLAG FOR WIDE
                 197 => {
-                    let index = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let index = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     let dimensions = self.code[code_index + 3];
                     writeln!(f, "multianewarray #{} {}", index, dimensions)?;
                     code_index += 3;
                 },
                 198 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "ifnull #{}", branch)?;
                     code_index += 2;
                 },
                 199 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let branch = unsafe {                      
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     writeln!(f, "ifnonnull #{}", branch)?;
                     code_index += 2;

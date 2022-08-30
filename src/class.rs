@@ -328,7 +328,7 @@ impl<'a>  Class {
                     (Entry::NameAndType(NameAndTypeInfo{name_index, descriptor_index}), false)
                 },
                 15 => {
-                    let reference_kind = match read_u16(data_ptr, &mut location) {
+                    let reference_kind = match read_u8(data_ptr, &mut location) {
                         1 => ReferenceKind::RefGetField,
                         2 => ReferenceKind::RefGetStatic,
                         3 => ReferenceKind::RefPutField,

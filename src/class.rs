@@ -386,7 +386,7 @@ impl<'a>  Class {
         let mut fields = Vec::with_capacity(fields_count as usize);
         while fields.capacity() > fields.len() {
             let field_flags = read_u16(data_ptr, &mut location);
-            let name_index = read_u16(data_ptr, &mut location);
+            let field_name_index = read_u16(data_ptr, &mut location);
             let descriptor_index = read_u16(data_ptr, &mut location);
             let mut constant_value = None;
             let mut synthetic = false;
@@ -470,7 +470,7 @@ impl<'a>  Class {
             }
             fields.push(FieldInfo {
                 access_flags: flags::field::AccessFlags { flags: field_flags },
-                name_index,
+                name_index: field_name_index,
                 descriptor_index,
                 constant_value,
                 synthetic,
@@ -486,7 +486,7 @@ impl<'a>  Class {
         let mut methods = Vec::with_capacity(methods_count as usize);
         while methods.capacity() > methods.len() {
             let method_flags = read_u16(data_ptr, &mut location);
-            let name_index = read_u16(data_ptr, &mut location);
+            let method_name_index = read_u16(data_ptr, &mut location);
             let descriptor_index = read_u16(data_ptr, &mut location);
             let mut code = None;
             let mut exceptions = None;
@@ -509,6 +509,7 @@ impl<'a>  Class {
                 }
                 let name: &str = cpool[name_index as usize - 1].as_utf8()?;
                 let length = read_u32(data_ptr, &mut location);
+                let starting_location = location;
                 match name {
                     "Code" => {
                         if let Some(_) = code {
@@ -545,6 +546,7 @@ impl<'a>  Class {
                             }
                             let name_code: &str = cpool[name_index_code as usize - 1].as_utf8()?;
                             let length_code = read_u32(data_ptr, &mut location);
+                            let starting_location_code = location;
                             match name_code {
                                 "LineNumberTable" => {
                                     let table_length = read_u16(data_ptr, &mut location);
@@ -653,8 +655,9 @@ impl<'a>  Class {
                                 },
                                 _ => location += length_code as isize, // Ignore custom attributes.
                             }
+                            assert!(starting_location_code + length_code as isize == location);
                         }
-                        code = Some( Code {
+                        code = Some(Code {
                             max_stack,
                             max_locals,
                             code: code_data,
@@ -665,7 +668,7 @@ impl<'a>  Class {
                             stack_map_table,
                             rt_vis_type_annotations: code_rt_vis_type_annotations,
                             rt_invis_type_annotations: code_rt_invis_type_annotations,
-                        })
+                        });
                     },
                     "Exceptions" => {
                         if let Some(_) = exceptions {
@@ -785,10 +788,11 @@ impl<'a>  Class {
                     },
                     _ => location += length as isize, // Ignore custom attributes.
                 }
+                assert!(starting_location + length as isize == location);
             }
             let method = MethodInfo {
                 access_flags: flags::method::AccessFlags{ flags: method_flags},
-                name_index,
+                name_index: method_name_index,
                 descriptor_index,
                 code,
                 exceptions,

@@ -123,7 +123,7 @@ impl<'a> JVM {
         let c = unsafe {
             let mut buf_bytes = std::slice::from_raw_parts_mut(buffer.as_ptr() as *mut u8, buffer.len() * std::mem::size_of::<u64>());
             f.read(&mut buf_bytes).unwrap();
-            Class::new(&buf_bytes).unwrap()
+            Class::new(&buf_bytes)?
         };
         this_loaded_classes.insert(String::from(c.name()), Rc::new(c));
         Ok(())

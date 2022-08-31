@@ -51,6 +51,14 @@ pub struct NameAndTypeInfo {
     pub descriptor_index: u16,
 }
 
+// This could be efficient by using an &str, but that means we have to deal with self-referential structs.
+// That can come later.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct NameAndType {
+    pub name: String,
+    pub descriptor: String,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RefInfo {
     pub class_index: u16,

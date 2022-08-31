@@ -3150,10 +3150,13 @@ impl JVM {
         let field = frame.rt_const_pool.cp_entry(index)?.as_field_ref()?;
         let class_index = frame.rt_const_pool.cp_entry(field.class_index)?.as_class()?;
         let class_name = frame.rt_const_pool.cp_entry(*class_index)?.as_utf8()?;
+        println!("Loading from class {}", class_name);
         let loaded_classes = &mut self.m_loaded_classes;
         let class = access_macros::resolve_class_reference!(*loaded_classes, class_name)?;
-        let name_and_type = frame.rt_const_pool.cp_entry(field.name_and_type_index)?;
-        let field = class.get_static(*name_and_type.as_name_and_type()?, &mut self.m_loaded_classes)?;
+        let name_and_type = frame.rt_const_pool.cp_entry(field.name_and_type_index)?.as_name_and_type()?;
+        let name = frame.rt_const_pool.cp_entry(name_and_type.name_index)?.as_utf8()?;
+        let descriptor = frame.rt_const_pool.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
+        let field = class.get_static(name, &descriptor, &mut self.m_loaded_classes)?;
         let new_value;
         // If this value is a "copy" type, we make a new Value. Otherwise, we use the reference inside to make a new value.       
         if field.is_reference() {
@@ -3176,14 +3179,19 @@ impl JVM {
         let class_index = frame.rt_const_pool.cp_entry(field.class_index)?.as_class()?;
         let class_name = frame.rt_const_pool.cp_entry(*class_index)?.as_utf8()?;
         let mut class = JVM::resolve_class_reference_mut(&mut self.m_loaded_classes, &class_name)?;
-        let name_and_type = frame.rt_const_pool.cp_entry(field.name_and_type_index)?;
+        let name_and_type = frame.rt_const_pool.cp_entry(field.name_and_type_index)?.as_name_and_type()?;
+        let name = frame.rt_const_pool.cp_entry(name_and_type.name_index)?.as_utf8()?;
+        let descriptor = frame.rt_const_pool.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
         let field = match frame.op_stack.pop() {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::PUTSTATIC)),
         };
-        unsafe {Rc::get_mut_unchecked(&mut class).put_static(*name_and_type.as_name_and_type()?, field, &mut self.m_loaded_classes)?; }
+        unsafe {Rc::get_mut_unchecked(&mut class).put_static(name, descriptor, field, &mut self.m_loaded_classes)?; }
         Ok(())
     }
+    // TODO: There is a bug in these two functions that we fixed in the _statics. 
+    // We have to resolve the name and type in the current function, and use string comparisons. 
+    // Check the commit history on the _statics for more info.
     pub fn getfield(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
         let pc = thread.m_pc + 1;

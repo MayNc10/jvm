@@ -10,7 +10,7 @@ use crate::attributes::code::stack_map_table::{StackMapFrame, VerificationTypeIn
 use crate::attributes::code::{Code, Exception, LineNumber, LocalVariable, LocalVariableType};
 use crate::attributes::module::{Module, Require, Export, Open, Provide};
 use crate::attributes::{InnerClass, EnclosingMethod, BootstrapMethod, RecordComponentInfo, MethodParameter};
-use crate::constant_pool::{Entry, NameAndTypeInfo, RefInfo, MethodHandleInfo, ReferenceKind, DynamicInfo};
+use crate::constant_pool::{Entry, NameAndTypeInfo, RefInfo, MethodHandleInfo, ReferenceKind, DynamicInfo, NameAndType};
 use crate::{data_access::*, access_macros};
 use crate::errorcodes::{Error, Opcode};
 use crate::flags;
@@ -181,7 +181,7 @@ pub struct Class {
     m_rt_vis_type_annotations: Option<Vec<TypeAnnotation>>,
     m_rt_invis_type_annotations: Option<Vec<TypeAnnotation>>,
 
-    m_static_fields: HashMap<NameAndTypeInfo, Rc<Value>>, 
+    m_static_fields: HashMap<NameAndType, Rc<Value>>, 
 }
 
 // TODO: All of these should be marked #[inline]
@@ -196,7 +196,7 @@ impl<'a>  Class {
     pub fn methods(&self) -> &Vec<MethodInfo> {
         &self.m_methods
     }
-    pub fn static_fields(&self) -> &HashMap<NameAndTypeInfo, Rc< Value>> {
+    pub fn static_fields(&self) -> &HashMap<NameAndType, Rc< Value>> {
         &self.m_static_fields 
     } 
     pub fn cp_entry(&self, index: u16) -> Result<&Entry, Error> {
@@ -1203,10 +1203,12 @@ impl<'a>  Class {
 }
 
 impl<'a>  Class {
-    pub fn get_static<'b, 'c>(&'a self, name_and_type: NameAndTypeInfo, jvm_loaded_classes: &'b mut HashMap<String, Rc< Class>>) -> Result<Rc<Value>, Error> 
+    // We could use a different type than NameAndType for the &Strings, but this is simpler and terribly slow.
+    pub fn get_static<'b, 'c>(&'a self, name: &String, descriptor: &String, jvm_loaded_classes: &'b mut HashMap<String, Rc< Class>>) -> Result<Rc<Value>, Error> 
     where
         'b : 'c,
     {
+        let name_and_type = NameAndType { name: String::from(name), descriptor: String::from(descriptor) };
         let mut class;
         let mut current_class = &access_macros::resolve_class_reference!(*jvm_loaded_classes, self.name())?;
         while current_class.has_super() {
@@ -1245,9 +1247,10 @@ impl<'a>  Class {
             class = access_macros::resolve_class_reference!(*jvm_loaded_classes, current_class.super_name().unwrap())?;
             current_class = &class;
         }
-        Err(Error::NoSuchFieldError(Opcode::PUTSTATIC))
+        Err(Error::NoSuchFieldError(Opcode::GETSTATIC))
     }
-    pub fn put_static(&mut self, name_and_type: NameAndTypeInfo, value:  Value, jvm_loaded_classes: &mut HashMap<String, Rc< Class>>) -> Result<(), Error> {
+    pub fn put_static(&mut self, name: &String, descriptor: &String, value:  Value, jvm_loaded_classes: &mut HashMap<String, Rc< Class>>) -> Result<(), Error> {
+        let name_and_type = NameAndType { name: String::from(name), descriptor: String::from(descriptor) };
         let mut current_class = access_macros::resolve_class_reference!(*jvm_loaded_classes, self.name())?;
         while current_class.has_super() {
             // First, check the current class's fields.

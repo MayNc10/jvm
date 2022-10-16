@@ -5,7 +5,7 @@ use std::rc::Rc;
 use crate::class::{Class, self};
 use crate::constant_pool::{Entry, ReferenceKind};
 use crate::errorcodes::{Error, Opcode};
-use crate::reference::{Reference, Monitor};
+use crate::reference::{Reference, Monitor, object};
 use crate::reference::array::Array;
 use crate::reference::object::Object;
 use crate::value::{Value, VarValue};
@@ -144,7 +144,7 @@ impl JVM {
     }
     pub fn bipush(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(2)?;
         let frame = access_macros::current_frame_mut!(thread);
         let byte = Value::Byte(frame.current_method.code()?[pc] as i32);
@@ -153,7 +153,7 @@ impl JVM {
     }
     pub fn sipush(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
 
@@ -164,10 +164,9 @@ impl JVM {
     }
     pub fn ldc(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(2)?;
         let frame = access_macros::current_frame_mut!(thread);
-
         // First, get the constant pool entry at that index.
         let entry = frame.rt_const_pool.cp_entry(frame.current_method.code()?[pc] as u16)?;
         match entry {
@@ -178,9 +177,28 @@ impl JVM {
                 // The Java spec says that if we have already created an instance of String with the same base string, we cant just get a reference to it.
                 // We aren't going to do this right now, but we should implement it in the future.
                 // Instead, we are taking the path of creating a new String instance.
-                // For right now, we aren't implemting any of it, just because it requires a detour into how String works
-                // (e.g. how do we create one from a constant string, how do we call .intern on it, ...)
-                return Err(Error::Todo(Opcode::LDC));
+                // First, we create the new String.
+                let current_class = Rc::clone(&frame.rt_const_pool);
+                let s_raw = current_class.cp_entry(*s)?.as_utf8()?; 
+                let s_obj = Object::new_with_name("java/lang/String", self)?;
+                let string_class = Rc::clone(&s_obj.m_class);
+                let s_ref = Reference::Object(s_obj.clone(), Rc::new(Monitor::new()));             
+                let carray = Array::Char(s_raw.encode_utf16().collect());
+                let carray_len = carray.len();
+                let carray_asref = Reference::Array(carray, Rc::new(Monitor::new()));
+                let mut s_ref_rc = Rc::new(s_ref);
+                let thread = access_macros::current_thread_mut!(self);
+                let frame = access_macros::current_frame_mut!(thread);
+                frame.op_stack.push(Value::Reference(Rc::clone(&mut s_ref_rc)));
+                frame.op_stack.push(Value::Reference(s_ref_rc)); // duplicate the value, so we still have one afterwards.
+                frame.op_stack.push(Value::Reference(Rc::new(carray_asref)));
+                frame.op_stack.push(Value::Int(0));
+                frame.op_stack.push(Value::Int(carray_len as i32));
+                self.setup_method_call_from_name("<init>", "([CII)V", Rc::clone(&string_class) , false)?;
+                self.run_until_method_exit();
+                // Lastly, we have to call .intern() on it.
+                // String <init> calls this already, so I don't think we have to call it.
+                //self.execute_native_from_name("intern", "()Ljava/lang/String;", string_class)?;
             },
             Entry::Class(c) => {
                 // The spec says we have to return a reference to the class or interface itself. 
@@ -236,7 +254,7 @@ impl JVM {
     }
     pub fn ldc_w(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
 
@@ -308,7 +326,7 @@ impl JVM {
     }
     pub fn ldc2_w(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
 
@@ -336,7 +354,7 @@ impl JVM {
         let thread = access_macros::current_thread_mut!(self);
         let offset = if wide {2} else {1};
         thread.inc_pc(1 + offset)?;
-        let pc = (thread.m_pc as isize - offset) as usize;
+        let pc = (thread.pc() as isize - offset) as usize;
         let frame = access_macros::current_frame_mut!(thread);
         let index = match wide {
             false => {
@@ -354,7 +372,7 @@ impl JVM {
         let thread = access_macros::current_thread_mut!(self);
         let offset = if wide {2} else {1};
         thread.inc_pc(1 + offset)?;
-        let pc = (thread.m_pc as isize - offset) as usize;
+        let pc = (thread.pc() as isize - offset) as usize;
         let frame = access_macros::current_frame_mut!(thread);
         let index = match wide {
             false => {
@@ -372,7 +390,7 @@ impl JVM {
         let thread = access_macros::current_thread_mut!(self);
         let offset = if wide {2} else {1};
         thread.inc_pc(1 + offset)?;
-        let pc = (thread.m_pc as isize - offset) as usize;
+        let pc = (thread.pc() as isize - offset) as usize;
         let frame = access_macros::current_frame_mut!(thread);
         let index = match wide {
             false => {
@@ -390,7 +408,7 @@ impl JVM {
         let thread = access_macros::current_thread_mut!(self);
         let offset = if wide {2} else {1};
         thread.inc_pc(1 + offset)?;
-        let pc = (thread.m_pc as isize - offset) as usize;
+        let pc = (thread.pc() as isize - offset) as usize;
         let frame = access_macros::current_frame_mut!(thread);
         let index = match wide {
             false => {
@@ -408,7 +426,7 @@ impl JVM {
         let thread = access_macros::current_thread_mut!(self);
         let offset = if wide {2} else {1};
         thread.inc_pc(1 + offset)?;
-        let pc = (thread.m_pc as isize - offset) as usize;
+        let pc = (thread.pc() as isize - offset) as usize;
         let frame = access_macros::current_frame_mut!(thread);
         let index = match wide {
             false => {
@@ -598,7 +616,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::IALOAD)),
+            None => return Err(Error::DoubleMutableReference(Opcode::IALOAD)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::IALOAD)),
         };
         if !arr.is_iarray() {
@@ -623,7 +641,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::LALOAD)),
+            None => return Err(Error::DoubleMutableReference(Opcode::LALOAD)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::LALOAD)),
         };
         if !arr.is_larray() {
@@ -648,7 +666,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::FALOAD)),
+            None => return Err(Error::DoubleMutableReference(Opcode::FALOAD)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::FALOAD)),
         };
         if !arr.is_farray() {
@@ -673,7 +691,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::DALOAD)),
+            None => return Err(Error::DoubleMutableReference(Opcode::DALOAD)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::DALOAD)),
         };
         if !arr.is_darray() {
@@ -698,7 +716,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::AALOAD)),
+            None => return Err(Error::DoubleMutableReference(Opcode::AALOAD)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::AALOAD)),
         };
         if !arr.is_refarray() {
@@ -723,7 +741,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::BALOAD)),
+            None => return Err(Error::DoubleMutableReference(Opcode::BALOAD)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::BALOAD)),
         };
         if !arr.is_barray() | !arr.is_boolarray() {
@@ -748,7 +766,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::CALOAD)),
+            None => return Err(Error::DoubleMutableReference(Opcode::CALOAD)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::CALOAD)),
         };
         if !arr.is_carray() {
@@ -773,7 +791,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::SALOAD)),
+            None => return Err(Error::DoubleMutableReference(Opcode::SALOAD)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::SALOAD)),
         };
         if !arr.is_sarray() {
@@ -785,7 +803,7 @@ impl JVM {
     // Stores
     pub fn istore(&mut self, wide: bool) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(2 + (wide as isize))?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = match wide {
@@ -798,12 +816,12 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::ISTORE)),
         };
-        frame.local_variables[index] = VarValue::Int(*val.as_int()?);
+        frame.insert_local(VarValue::Int(*val.as_int()?), index);
         Ok(())
     }
     pub fn lstore(&mut self, wide: bool) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(2 + (wide as isize))?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = match wide {
@@ -816,12 +834,12 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::LSTORE)),
         };
-        frame.local_variables[index] = VarValue::Long(*val.as_long()?);
+        frame.insert_local(VarValue::Long(*val.as_long()?), index);
         Ok(())
     }
     pub fn fstore(&mut self, wide: bool) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(2 + (wide as isize))?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = match wide {
@@ -834,12 +852,12 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::FSTORE)),
         };
-        frame.local_variables[index] = VarValue::Float(*val.as_float()?);
+        frame.insert_local(VarValue::Float(*val.as_float()?), index);
         Ok(())
     }
     pub fn dstore(&mut self, wide: bool) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(2 + (wide as isize))?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = match wide {
@@ -852,12 +870,12 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::DSTORE)),
         };
-        frame.local_variables[index] = VarValue::Double(*val.as_double()?);
+        frame.insert_local(VarValue::Double(*val.as_double()?), index);
         Ok(())
     }
     pub fn astore(&mut self, wide: bool) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(2 + (wide as isize))?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = match wide {
@@ -870,7 +888,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::ASTORE)),
         };
-        frame.local_variables[index] = VarValue::Reference(val.as_reference()?.clone());
+        frame.insert_local(VarValue::Reference(val.as_reference()?.clone()), index);
         Ok(())
     }
     pub fn istore_0(&mut self) -> Result<(), Error> {
@@ -881,7 +899,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::ISTORE0)),
         };
-        frame.local_variables[0] = VarValue::Int(*val.as_int()?);
+        frame.insert_local(VarValue::Int(*val.as_int()?), 0);
         Ok(())
     }
     pub fn istore_1(&mut self) -> Result<(), Error> {
@@ -892,7 +910,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::ISTORE1)),
         };
-        frame.local_variables[1] = VarValue::Int(*val.as_int()?);
+        frame.insert_local(VarValue::Int(*val.as_int()?), 1);
         Ok(())
     }
     pub fn istore_2(&mut self) -> Result<(), Error> {
@@ -903,7 +921,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::ISTORE2)),
         };
-        frame.local_variables[2] = VarValue::Int(*val.as_int()?);
+        frame.insert_local(VarValue::Int(*val.as_int()?), 2);
         Ok(())
     }
     pub fn istore_3(&mut self) -> Result<(), Error> {
@@ -914,7 +932,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::ISTORE3)),
         };
-        frame.local_variables[3] = VarValue::Int(*val.as_int()?);
+        frame.insert_local(VarValue::Int(*val.as_int()?), 3);
         Ok(())
     }
     pub fn lstore_0(&mut self) -> Result<(), Error> {
@@ -925,7 +943,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::LSTORE0)),
         };
-        frame.local_variables[0] = VarValue::Long(*val.as_long()?);
+        frame.insert_local(VarValue::Long(*val.as_long()?), 0);
         Ok(())
     }
     pub fn lstore_1(&mut self) -> Result<(), Error> {
@@ -936,7 +954,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::LSTORE1)),
         };
-        frame.local_variables[1] = VarValue::Long(*val.as_long()?);
+        frame.insert_local(VarValue::Long(*val.as_long()?), 1);
         Ok(())
     }
     pub fn lstore_2(&mut self) -> Result<(), Error> {
@@ -947,7 +965,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::LSTORE2)),
         };
-        frame.local_variables[2] = VarValue::Long(*val.as_long()?);
+        frame.insert_local(VarValue::Long(*val.as_long()?), 2);
         Ok(())
     }
     pub fn lstore_3(&mut self) -> Result<(), Error> {
@@ -958,7 +976,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::LSTORE3)),
         };
-        frame.local_variables[3] = VarValue::Long(*val.as_long()?);
+        frame.insert_local(VarValue::Long(*val.as_long()?), 3);
         Ok(())
     }
     pub fn fstore_0(&mut self) -> Result<(), Error> {
@@ -969,7 +987,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::FSTORE0)),
         };
-        frame.local_variables[0] = VarValue::Float(*val.as_float()?);
+        frame.insert_local(VarValue::Float(*val.as_float()?), 0);
         Ok(())
     }
     pub fn fstore_1(&mut self) -> Result<(), Error> {
@@ -980,7 +998,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::FSTORE1)),
         };
-        frame.local_variables[1] = VarValue::Float(*val.as_float()?);
+        frame.insert_local(VarValue::Float(*val.as_float()?), 1);
         Ok(())
     }
     pub fn fstore_2(&mut self) -> Result<(), Error> {
@@ -991,7 +1009,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::FSTORE2)),
         };
-        frame.local_variables[2] = VarValue::Float(*val.as_float()?);
+        frame.insert_local(VarValue::Float(*val.as_float()?), 2);
         Ok(())
     }
     pub fn fstore_3(&mut self) -> Result<(), Error> {
@@ -1002,7 +1020,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::FSTORE3)),
         };
-        frame.local_variables[3] = VarValue::Float(*val.as_float()?);
+        frame.insert_local(VarValue::Float(*val.as_float()?), 3);
         Ok(())
     }
     pub fn dstore_0(&mut self) -> Result<(), Error> {
@@ -1013,7 +1031,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::DSTORE0)),
         };
-        frame.local_variables[0] = VarValue::Double(*val.as_double()?);
+        frame.insert_local(VarValue::Double(*val.as_double()?), 0);
         Ok(())
     }
     pub fn dstore_1(&mut self) -> Result<(), Error> {
@@ -1024,7 +1042,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::DSTORE1)),
         };
-        frame.local_variables[1] = VarValue::Double(*val.as_double()?);
+        frame.insert_local(VarValue::Double(*val.as_double()?), 1);
         Ok(())
     }
     pub fn dstore_2(&mut self) -> Result<(), Error> {
@@ -1035,7 +1053,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::DSTORE2)),
         };
-        frame.local_variables[2] = VarValue::Double(*val.as_double()?);
+        frame.insert_local(VarValue::Double(*val.as_double()?), 2);
         Ok(())
     }
     pub fn dstore_3(&mut self) -> Result<(), Error> {
@@ -1046,7 +1064,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::DSTORE3)),
         };
-        frame.local_variables[3] = VarValue::Double(*val.as_double()?);
+        frame.insert_local(VarValue::Double(*val.as_double()?), 3);
         Ok(())
     }
     pub fn astore_0(&mut self) -> Result<(), Error> {
@@ -1057,7 +1075,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::ASTORE0)),
         };
-        frame.local_variables[0] = VarValue::Reference(val.as_reference()?.clone());
+        frame.insert_local(VarValue::Reference(val.as_reference()?.clone()), 0);
         Ok(())
     }
     pub fn astore_1(&mut self) -> Result<(), Error> {
@@ -1068,7 +1086,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::ASTORE1)),
         };
-        frame.local_variables[1] = VarValue::Reference(val.as_reference()?.clone());
+        frame.insert_local(VarValue::Reference(val.as_reference()?.clone()), 1);
         Ok(())
     }
     pub fn astore_2(&mut self) -> Result<(), Error> {
@@ -1079,7 +1097,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::ASTORE2)),
         };
-        frame.local_variables[2] = VarValue::Reference(val.as_reference()?.clone());
+        frame.insert_local(VarValue::Reference(val.as_reference()?.clone()), 2);
         Ok(())
     }
     pub fn astore_3(&mut self) -> Result<(), Error> {
@@ -1090,7 +1108,7 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::ASTORE3)),
         };
-        frame.local_variables[3] = VarValue::Reference(val.as_reference()?.clone());
+        frame.insert_local(VarValue::Reference(val.as_reference()?.clone()), 3);
         Ok(())
     }
     pub fn iastore(&mut self) -> Result<(), Error> {
@@ -1115,7 +1133,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let array = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::IASTORE)),
+            None => return Err(Error::DoubleMutableReference(Opcode::IASTORE)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::IASTORE)),
         };
         if !array.is_iarray() {
@@ -1146,7 +1164,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let array = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::LASTORE)),
+            None => return Err(Error::DoubleMutableReference(Opcode::LASTORE)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::LASTORE)),
         };
         if !array.is_larray() {
@@ -1177,7 +1195,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let array = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::FASTORE)),
+            None => return Err(Error::DoubleMutableReference(Opcode::FASTORE)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::FASTORE)),
         };
         if !array.is_farray() {
@@ -1208,7 +1226,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let array = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::DASTORE)),
+            None => return Err(Error::DoubleMutableReference(Opcode::DASTORE)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::DASTORE)),
         };
         if !array.is_darray() {
@@ -1240,7 +1258,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let array = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::AASTORE)),
+            None => return Err(Error::DoubleMutableReference(Opcode::AASTORE)),
             _ => return Err(Error::IncorrectReferenceType(Opcode::AASTORE)),
         };
         if !array.is_refarray() {
@@ -1282,7 +1300,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let array = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::BASTORE)),
+            None => return Err(Error::DoubleMutableReference(Opcode::BASTORE)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::BASTORE)),
         };
         if !array.is_barray() {
@@ -1313,7 +1331,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let array = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::CASTORE)),
+            None => return Err(Error::DoubleMutableReference(Opcode::CASTORE)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::CASTORE)),
         };
         if !array.is_carray() {
@@ -1344,7 +1362,7 @@ impl JVM {
         let mut arrayref_rc = arrayref.as_reference_mut()?;
         let array = match Rc::get_mut(&mut arrayref_rc) {
             Some(Reference::Array(arr, _)) => arr,
-            None => return Err(Error::DoubleMultableReference(Opcode::SASTORE)),
+            None => return Err(Error::DoubleMutableReference(Opcode::SASTORE)),
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::SASTORE)),
         };
         if !array.is_sarray() {
@@ -2195,7 +2213,7 @@ impl JVM {
     }
     pub fn iinc(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = frame.current_method.code()?[pc];
@@ -2509,7 +2527,7 @@ impl JVM {
     }
     pub fn ifeq(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val = match frame.op_stack.pop() {
@@ -2530,7 +2548,7 @@ impl JVM {
     }
     pub fn ifne(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val = match frame.op_stack.pop() {
@@ -2551,7 +2569,7 @@ impl JVM {
     }
     pub fn iflt(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val = match frame.op_stack.pop() {
@@ -2572,7 +2590,7 @@ impl JVM {
     }
     pub fn ifge(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val = match frame.op_stack.pop() {
@@ -2593,7 +2611,7 @@ impl JVM {
     }
     pub fn ifgt(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val = match frame.op_stack.pop() {
@@ -2614,7 +2632,7 @@ impl JVM {
     }
     pub fn ifle(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val = match frame.op_stack.pop() {
@@ -2635,7 +2653,7 @@ impl JVM {
     }
     pub fn if_icmpeq(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val2 = match frame.op_stack.pop() {
@@ -2660,7 +2678,7 @@ impl JVM {
     }
     pub fn if_icmpne(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val2 = match frame.op_stack.pop() {
@@ -2685,7 +2703,7 @@ impl JVM {
     }
     pub fn if_icmplt(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val2 = match frame.op_stack.pop() {
@@ -2710,7 +2728,7 @@ impl JVM {
     }
     pub fn if_icmpge(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val2 = match frame.op_stack.pop() {
@@ -2735,7 +2753,7 @@ impl JVM {
     }
     pub fn if_icmpgt(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val2 = match frame.op_stack.pop() {
@@ -2760,7 +2778,7 @@ impl JVM {
     }
     pub fn if_icmple(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val2 = match frame.op_stack.pop() {
@@ -2785,7 +2803,7 @@ impl JVM {
     }
     pub fn if_amcpeq(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val2 = match frame.op_stack.pop() {
@@ -2810,7 +2828,7 @@ impl JVM {
     }
     pub fn if_amcpne(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let val2 = match frame.op_stack.pop() {
@@ -2836,7 +2854,7 @@ impl JVM {
     // Control
     pub fn goto(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let boffset = {
             let frame = access_macros::current_frame_mut!(thread);
             let bbyte1 = frame.current_method.code()?[pc] as i16;
@@ -2849,7 +2867,7 @@ impl JVM {
     }
     pub fn jsr(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let boffset = {
             let frame = access_macros::current_frame_mut!(thread);
             frame.op_stack.push(Value::ReturnAddress(pc as u16 + 2));
@@ -2862,7 +2880,7 @@ impl JVM {
     }    
     pub fn ret(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let addr = {
             let frame = access_macros::current_frame_mut!(thread);
             let index = frame.current_method.code()?[pc] as usize;
@@ -2873,7 +2891,7 @@ impl JVM {
     }
     pub fn tableswitch(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let mut pc = thread.m_pc + 1;
+        let mut pc = thread.pc() + 1;
         pc += 4 - (pc % 4); // pc has to be a multiple of 4.
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
@@ -2897,7 +2915,7 @@ impl JVM {
     }
     pub fn lookupswitch(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let mut pc = thread.m_pc + 1;
+        let mut pc = thread.pc() + 1;
         pc += 4 - (pc % 4); // pc has to be a multiple of 4.
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
@@ -3027,7 +3045,6 @@ impl JVM {
     // This function is really rough. We need to make it more readable.
     // It's also pretty broken. We don't validate the component types of arrays and we don't check for narrowing conversions in classes and interfaces.
     pub fn areturn(&mut self) -> Result<(), Error> {
-        let loaded_classes = &mut self.m_loaded_classes;
         let thread = access_macros::current_thread_mut!(self);
         let return_value = {
             let frame = access_macros::current_frame_mut!(thread);
@@ -3039,13 +3056,14 @@ impl JVM {
                 Some(v) => v,
                 None => return Err(Error::StackUnderflow(Opcode::ARETURN)),
             };
+            frame.op_stack = Vec::new();
+            let current_class = Rc::clone(&frame.rt_const_pool);
             {
-                let ret_descriptor = frame.current_method.return_descriptor(&frame.rt_const_pool)?;
+                let ret_descriptor = frame.current_method.return_descriptor(&current_class)?;
                 let mut ret_ref = ret_val.as_reference()?;
-                let ret_ref_inner = match Rc::get_mut(&mut ret_ref) {
-                    Some(inner) => inner,
-                    None => return Err(Error::DoubleMultableReference(Opcode::ARETURN)),
-                };
+                let ret_ref_inner = unsafe { 
+                    Rc::get_mut_unchecked(&mut ret_ref) // Using unchecked seems like what we should do here.
+                };  
                 // This is my understanding of the rules regarding reference type assignment compatibility:
                 // If a type is Null, it matches with any reference type. 
                 // If a type is an array, it is therefore an instance of java.lang.reflect.Array, and so can be assigned with an array or the class Object.
@@ -3055,8 +3073,7 @@ impl JVM {
                 // We actually have to write a recursive function for this situation, because of Array assignment. 
                 // If we assign an array to another array, we need to check the compatibility of their inner types.
                 // For now, we just allow all arrays to be cast to any other array.
-                // FIXME: ^
-                
+                // FIXME: ^   
                 match ret_ref_inner {
                     Reference::Null => (),
                     Reference::Array(a, _) => {
@@ -3075,21 +3092,21 @@ impl JVM {
                             }
                             for interface_index in current_class.interfaces() {
                                 let interface = current_class.cp_entry(*interface_index)?.as_class()?;
-                                let mut current_interface = access_macros::resolve_class_reference!(*loaded_classes, current_class.cp_entry(*interface)?.as_utf8()?)?;
+                                let mut current_interface = self.resolve_class_reference(current_class.cp_entry(*interface)?.as_utf8()?)?;
                                 let mut found_interface = false;
                                 while current_interface.has_super() {
                                     if current_interface.name() == ret_descriptor {
                                         found_interface = true;
                                         break;
                                     }
-                                    current_interface = access_macros::resolve_class_reference!(*loaded_classes, current_interface.super_name().unwrap())?;
+                                    current_interface = self.resolve_class_reference(current_interface.super_name().unwrap())?;
                                 }
                                 if found_interface {
                                     found = true;
                                     break;
                                 }
                             }
-                            current_class = access_macros::resolve_class_reference!(*loaded_classes, current_class.super_name().unwrap())?;
+                            current_class = self.resolve_class_reference(current_class.super_name().unwrap())?;
                         }
                         if !found {
                             return Err(Error::IncompatibleReturnType(Opcode::ARETURN));
@@ -3104,7 +3121,7 @@ impl JVM {
                                 found = true;
                                 break;
                             }
-                            current_interface = access_macros::resolve_class_reference!(*loaded_classes, current_interface.super_name().unwrap())?;
+                            current_interface = self.resolve_class_reference(current_interface.super_name().unwrap())?;
                         }
                         if !found {
                             return Err(Error::IncompatibleReturnType(Opcode::ARETURN));
@@ -3114,6 +3131,7 @@ impl JVM {
             } 
             ret_val   
         };
+        let thread = access_macros::current_thread_mut!(self);
         let _ = match thread.m_stack.pop() {
             Some(_2) => _2,
             None => return Err(Error::FrameStackUnderflow(Opcode::DRETURN)),
@@ -3143,20 +3161,19 @@ impl JVM {
     // References
     pub fn getstatic(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
-        let field = frame.rt_const_pool.cp_entry(index)?.as_field_ref()?;
-        let class_index = frame.rt_const_pool.cp_entry(field.class_index)?.as_class()?;
-        let class_name = frame.rt_const_pool.cp_entry(*class_index)?.as_utf8()?;
-        println!("Loading from class {}", class_name);
-        let loaded_classes = &mut self.m_loaded_classes;
-        let class = access_macros::resolve_class_reference!(*loaded_classes, class_name)?;
-        let name_and_type = frame.rt_const_pool.cp_entry(field.name_and_type_index)?.as_name_and_type()?;
-        let name = frame.rt_const_pool.cp_entry(name_and_type.name_index)?.as_utf8()?;
-        let descriptor = frame.rt_const_pool.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
-        let field = class.get_static(name, &descriptor, &mut self.m_loaded_classes)?;
+        let current_class = Rc::clone(&frame.rt_const_pool);
+        let field = current_class.cp_entry(index)?.as_field_ref()?;
+        let class_index = current_class.cp_entry(field.class_index)?.as_class()?;
+        let class_name = current_class.cp_entry(*class_index)?.as_utf8()?;
+        let class = self.resolve_class_reference(class_name)?;
+        let name_and_type = current_class.cp_entry(field.name_and_type_index)?.as_name_and_type()?;
+        let name = current_class.cp_entry(name_and_type.name_index)?.as_utf8()?;
+        let descriptor = current_class.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
+        let field = class.get_static(name, &descriptor, self)?;
         let new_value;
         // If this value is a "copy" type, we make a new Value. Otherwise, we use the reference inside to make a new value.       
         if field.is_reference() {
@@ -3166,27 +3183,32 @@ impl JVM {
         else {
             new_value = (*field).clone();
         }
+        let thread = access_macros::current_thread_mut!(self);
+        let frame = access_macros::current_frame_mut!(thread);
         frame.op_stack.push(new_value);
         Ok(())
     }
     pub fn putstatic(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
-        let field = frame.rt_const_pool.cp_entry(index)?.as_field_ref()?;
-        let class_index = frame.rt_const_pool.cp_entry(field.class_index)?.as_class()?;
-        let class_name = frame.rt_const_pool.cp_entry(*class_index)?.as_utf8()?;
-        let mut class = JVM::resolve_class_reference_mut(&mut self.m_loaded_classes, &class_name)?;
-        let name_and_type = frame.rt_const_pool.cp_entry(field.name_and_type_index)?.as_name_and_type()?;
-        let name = frame.rt_const_pool.cp_entry(name_and_type.name_index)?.as_utf8()?;
-        let descriptor = frame.rt_const_pool.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
+        let current_class = Rc::clone(&frame.rt_const_pool);
+        let field = current_class.cp_entry(index)?.as_field_ref()?;
+        let class_index = current_class.cp_entry(field.class_index)?.as_class()?;
+        let class_name = current_class.cp_entry(*class_index)?.as_utf8()?;
+        let mut class = self.resolve_class_reference(&class_name)?;
+        let name_and_type = current_class.cp_entry(field.name_and_type_index)?.as_name_and_type()?;
+        let name = current_class.cp_entry(name_and_type.name_index)?.as_utf8()?;
+        let descriptor = current_class.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
+        let thread = access_macros::current_thread_mut!(self);
+        let frame = access_macros::current_frame_mut!(thread);
         let field = match frame.op_stack.pop() {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::PUTSTATIC)),
         };
-        unsafe {Rc::get_mut_unchecked(&mut class).put_static(name, descriptor, field, &mut self.m_loaded_classes)?; }
+        unsafe {Rc::get_mut_unchecked(&mut class).put_static(name, descriptor, field, self)?; }
         Ok(())
     }
     // TODO: There is a bug in these two functions that we fixed in the _statics. 
@@ -3194,7 +3216,7 @@ impl JVM {
     // Check the commit history on the _statics for more info.
     pub fn getfield(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
@@ -3202,23 +3224,26 @@ impl JVM {
             Some(mut v) => v.as_reference_mut()?,
             None => return Err(Error::StackUnderflow(Opcode::GETFIELD)),
         };
+        let current_class = frame.rt_const_pool.clone();
         let val = {
             let object_ref_inner = match Rc::get_mut(&mut object_ref) {
                 Some(o) => o,
-                None => return Err(Error::DoubleMultableReference(Opcode::GETFIELD)),
+                None => return Err(Error::DoubleMutableReference(Opcode::GETFIELD)),
             };
             let object = match object_ref_inner {
                 Reference::Object(o, _) => o,
                 _ => return Err(Error::IncorrectReferenceType(Opcode::GETFIELD)),
             };
-            object.get_field(frame.rt_const_pool.clone(), index, &mut self.m_loaded_classes)?
+            object.get_field(current_class, index, self)?
         };
+        let thread = access_macros::current_thread_mut!(self);
+        let frame = access_macros::current_frame_mut!(thread);
         frame.op_stack.push(val);
         Ok(())
     }
     pub fn putfield(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
@@ -3232,7 +3257,7 @@ impl JVM {
         };
         let object_ref_inner = match Rc::get_mut(&mut object_ref) {
             Some(o) => o,
-            None => return Err(Error::DoubleMultableReference(Opcode::PUTFIELD)),
+            None => return Err(Error::DoubleMutableReference(Opcode::PUTFIELD)),
         };
         let object = match object_ref_inner {
             Reference::Object(o, _) => o,
@@ -3242,45 +3267,38 @@ impl JVM {
         Ok(())
     }
     pub fn invokevirtual(&mut self) -> Result<(), Error> {
-        Err(Error::Todo(Opcode::INVOKEVIRTUAL))
-    }
-    pub fn invokespecial(&mut self) -> Result<(), Error> {
-        Err(Error::Todo(Opcode::INVOKESPECIAL))
-    }
-    pub fn invokestatic(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
-        let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);     
-        let entry = frame.rt_const_pool.cp_entry(index)?;
-        let (method_ref, is_interface) = match entry {
-            Entry::MethodRef(refinfo) => (refinfo, false),
-            Entry::InterfaceMethodRef(refinfo) => (refinfo, true),
-            _ => return Err(Error::IllegalConstantLoad(Opcode::INVOKESTATIC)),
+        let current_class = Rc::clone(&frame.rt_const_pool);
+        let (mut c, name, descriptor) = {
+            let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);   
+            let method_ref = current_class.cp_entry(index)?.as_method_ref()?;
+            let name_and_type = current_class.cp_entry(method_ref.name_and_type_index)?.as_name_and_type()?;
+            let name = current_class.cp_entry(name_and_type.name_index)?.as_utf8()?;
+            let descriptor = current_class.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
+            let c_info = current_class.cp_entry(method_ref.class_index)?.as_class()?;
+            let c_name = current_class.cp_entry(*c_info)?.as_utf8()?;
+            (self.resolve_class_reference(c_name.clone().as_str())?, name, descriptor)
         };
-        let name_and_type = frame.rt_const_pool.cp_entry(method_ref.name_and_type_index)?.as_name_and_type()?;
-        let name = frame.rt_const_pool.cp_entry(name_and_type.name_index)?.as_utf8()?;
-        let descriptor = frame.rt_const_pool.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
-        let c_info = frame.rt_const_pool.cp_entry(method_ref.class_index)?.as_class()?;
-        let c_name = frame.rt_const_pool.cp_entry(*c_info)?.as_utf8()?;
-        let mut c = access_macros::resolve_class_reference!(self.m_loaded_classes, c_name)?;
-        if is_interface {
-            if !((c.access_flags().flags & flags::class::ACC_INTERFACE) > 0) {
-                return Err(Error::IncompatibleMethodRefAndClass(Opcode::INVOKESTATIC));
-            }
-        }
-        else {
-            if (c.access_flags().flags & flags::class::ACC_INTERFACE) > 0 {
-                return Err(Error::IncompatibleMethodRefAndClass(Opcode::INVOKESTATIC));
-            }
-        }
+        let thread = access_macros::current_thread_mut!(self);
+        let frame = access_macros::current_frame_mut!(thread);
+        let object_val = match frame.op_stack.pop() {
+            Some(o) => o,
+            None => return Err(Error::StackUnderflow(Opcode::INVOKEVIRTUAL)),
+        };
+        let object_ref_rc = object_val.as_reference()?;
+        let object_ref = &*object_ref_rc;
+        let object = match object_ref {
+            Reference::Object(o, _) => o,
+            _ => return Err(Error::IncorrectReferenceType(Opcode::INVOKEVIRTUAL)), 
+        };
         let mut method_to_call = None; 
         // Resolve method
         {
             let mut found = false;
-            let loaded_classes = &mut self.m_loaded_classes;
-            while c.has_super() {
+            while c.has_super() && !found {
                 for method in c.methods() {
                     // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
                     // We still need to check for signature polymorphic functions.
@@ -3296,7 +3314,271 @@ impl JVM {
                     }
                 }   
                 // Recurse up the inheritance tree.
-                c = access_macros::resolve_class_reference!(*loaded_classes, c.super_name().unwrap())?;
+                if !found {
+                    c = self.resolve_class_reference(c.super_name().unwrap())?;
+                }
+                
+            }
+            // TODO: Search Superinterfaces of c.
+            if !found {
+                return Err(Error::NoSuchMethodError(Opcode::MethodInvoke));
+            }
+        }
+        let mut resolved_method = method_to_call.unwrap();
+        {
+            // search the methods of the object to see if we can override. 
+            if (resolved_method.access_flags.flags & flags::method::ACC_PRIVATE) == 0 {
+                let mut obj_c = object.m_class.clone();
+                let mut found = false;
+                while obj_c.has_super() && !found {
+                    for method in obj_c.methods() {
+                        // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
+                        // We still need to check for signature polymorphic functions.
+                        let method_descriptor = obj_c.cp_entry(method.descriptor_index)?.as_utf8()?;
+                        if method_descriptor != descriptor {
+                            continue;
+                        }
+                        let method_name = obj_c.cp_entry(method.name_index)?.as_utf8()?;
+                        if method_name != name {
+                            continue;
+                        }
+                        // we *should* check access control, but we don't
+                        resolved_method = method.clone();
+                        found = true;
+                        break;
+                    }   
+                    // Recurse up the inheritance tree.
+                    if !found {
+                        obj_c = self.resolve_class_reference(obj_c.super_name().unwrap())?;
+                    }
+                    
+                }
+                // TODO: Search Superinterfaces of c.
+            }
+        };
+        if (resolved_method.access_flags.flags & flags::method::ACC_STATIC) > 0 {
+            return Err(Error::IncompatibleClassChangeError(Opcode::INVOKEVIRTUAL));
+        } 
+        if (resolved_method.access_flags.flags & flags::method::ACC_ABSTRACT) > 0 {
+            return Err(Error::AbstractMethodError(Opcode::INVOKEVIRTUAL));
+        } 
+        if (resolved_method.access_flags.flags & flags::method::ACC_SYNCHRONIZED) > 0 {
+            // TODO: Enter monitors on Classes.
+        } 
+        if (resolved_method.access_flags.flags & flags::method::ACC_NATIVE) > 0 {
+            return self.execute_native(&resolved_method, c);
+        } 
+        self.setup_method_call(&resolved_method, c, true)
+    }
+    pub fn invokespecial(&mut self) -> Result<(), Error> {
+        let thread = access_macros::current_thread_mut!(self);
+        let pc = thread.pc() + 1;
+        thread.inc_pc(3)?;
+        let frame = access_macros::current_frame_mut!(thread);
+        let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16); 
+        let entry = frame.rt_const_pool.cp_entry(index)?;
+        let (method_ref, is_interface) = match entry {
+            Entry::MethodRef(refinfo) => (refinfo, false),
+            Entry::InterfaceMethodRef(refinfo) => (refinfo, true),
+            _ => return Err(Error::IllegalConstantLoad(Opcode::INVOKESTATIC)),
+        };
+        let current_class = Rc::clone(&frame.rt_const_pool);
+        let name_and_type = current_class.cp_entry(method_ref.name_and_type_index)?.as_name_and_type()?;
+        let name = current_class.cp_entry(name_and_type.name_index)?.as_utf8()?;
+        let descriptor = current_class.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
+        let c_info = current_class.cp_entry(method_ref.class_index)?.as_class()?;
+        let c_name = current_class.cp_entry(*c_info)?.as_utf8()?;
+        let mut c = self.resolve_class_reference(c_name)?;
+        if (c.access_flags().flags & flags::class::ACC_INTERFACE) > 0 {
+            return Err(Error::IncompatibleClassChangeError(Opcode::INVOKESPECIAL));
+        } 
+        // Resolve method
+        let mut resolved_method_wrapped = None; 
+        {
+            let mut found = false;
+            while c.has_super() && !found {
+                for method in c.methods() {
+                    // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
+                    // We still need to check for signature polymorphic functions.
+                    let method_descriptor = c.cp_entry(method.descriptor_index)?.as_utf8()?;
+                    if method_descriptor != descriptor {
+                        continue;
+                    }
+                    let method_name = c.cp_entry(method.name_index)?.as_utf8()?;
+                    if method_name == name {
+                        resolved_method_wrapped = Some(method.clone());
+                        found = true;
+                        break;
+                    }
+                }   
+                // Recurse up the inheritance tree.
+                if !found {
+                    c = self.resolve_class_reference(c.super_name().unwrap())?;
+                }
+                
+            }
+            // TODO: Search Superinterfaces of c.
+            if !found {
+                return Err(Error::NoSuchMethodError(Opcode::MethodInvoke));
+            }
+        }
+        let mut resolved_method = resolved_method_wrapped.unwrap();
+        let resolved_method_class = Rc::clone(&c); // Save the originating class of resolved_method so we can index it.
+        let resolved_name = resolved_method_class.cp_entry(resolved_method.name_index)?.as_utf8()?;
+        let resolved_desc = resolved_method_class.cp_entry(resolved_method.descriptor_index)?.as_utf8()?;
+        // Next, possibly change C
+        if (c.cp_entry(resolved_method.name_index)?.as_utf8()? != "<init>") && current_class.has_super() && ({
+            // Figure out if c is a superclass of current_class
+            let mut temp = Rc::clone(&current_class);
+            let mut res = false;
+            while temp.has_super() {
+                let super_name = temp.super_name().unwrap();
+                if super_name == c.name() {
+                    res = true;
+                    break;
+                }
+                temp = self.resolve_class_reference(super_name)?;
+            }
+            res
+        })
+        && ((c.access_flags().flags & flags::class::ACC_SUPER) > 0 ) {
+            c = self.resolve_class_reference(c.super_name().unwrap())?;
+        }
+        let mut actual_method_wrapped = Some(resolved_method.clone());
+        let mut actual_class = Rc::clone(&resolved_method_class);
+        // Now, select *actual* method
+        // All methods have to be instance methods. 
+        // First, check methods of c for a method with the same name and desc.
+        for method in c.methods() {
+            if (method.access_flags.flags & flags::method::ACC_STATIC) > 0 {
+                continue;
+            }
+            if (c.cp_entry(method.name_index)?.as_utf8()? == resolved_name) && (c.cp_entry(method.descriptor_index)?.as_utf8()? == resolved_desc) {
+                actual_method_wrapped = Some(method.clone());
+                actual_class = Rc::clone(&c);
+                break;
+            }
+        }
+        // Check superclasses, if c is a class
+        if actual_method_wrapped.is_none() & ((c.access_flags().flags & flags::class::ACC_INTERFACE) == 0) {
+            let mut c_super = Rc::clone(&c);
+            while c_super.has_super() {
+                for method in c.methods() {
+                    if (method.access_flags.flags & flags::method::ACC_STATIC) > 0 {
+                        continue;
+                    }
+                    if (c_super.cp_entry(method.name_index)?.as_utf8()? == resolved_name) && (c_super.cp_entry(method.descriptor_index)?.as_utf8()? == resolved_desc) {
+                        actual_method_wrapped = Some(method.clone());
+                        actual_class = Rc::clone(&c_super);
+                        break;
+                    }
+                }
+                c_super = self.resolve_class_reference(c_super.super_name().unwrap())?;
+            }
+        }
+        // Check object, if c in an interface.
+        if actual_method_wrapped.is_none() & ((c.access_flags().flags & flags::class::ACC_INTERFACE) > 0) {
+            let obj_class = self.resolve_class_reference("java/lang/Object")?;
+            for method in obj_class.methods() {
+                if (method.access_flags.flags & flags::method::ACC_STATIC) > 0 {
+                    continue;
+                }
+                if (obj_class.cp_entry(method.name_index)?.as_utf8()? == resolved_name) && (obj_class.cp_entry(method.descriptor_index)?.as_utf8()? == resolved_desc) {
+                    actual_method_wrapped = Some(method.clone());
+                    actual_class = Rc::clone(&obj_class);
+                    break;
+                }
+            }
+        }
+        // TODO: Check maximally specific methods in superinterfaces.
+
+        // I *think* the way this works is that if we don't find a method, we use the one we resolved.
+        let actual_method = actual_method_wrapped.unwrap();
+        if (actual_method.access_flags.flags & flags::method::ACC_STATIC) > 0 {
+            return Err(Error::IncompatibleClassChangeError(Opcode::INVOKESPECIAL));
+        } 
+        if (actual_method.access_flags.flags & flags::method::ACC_ABSTRACT) > 0 {
+            return Err(Error::AbstractMethodError(Opcode::INVOKESPECIAL));
+        } 
+        if (actual_method.access_flags.flags & flags::method::ACC_SYNCHRONIZED) > 0 {
+            let current_thread_number = self.m_thread_index;
+            let thread = access_macros::current_thread_mut!(self);
+            let frame = access_macros::current_frame_mut!(thread);
+            let mut objectref = match frame.op_stack.pop() {
+                Some(o) => o.as_reference()?,
+                None => return Err(Error::StackUnderflow(Opcode::INVOKESPECIAL)),
+            };
+            let object = unsafe { Rc::get_mut_unchecked(&mut objectref) };
+            match object {
+                Reference::Null => return Err(Error::NullPointerException(Opcode::MONITORENTER)),
+                Reference::Array(_, mrc) | Reference::Interface(_, mrc) | Reference::Object(_, mrc) => {
+                    let m = unsafe { Rc::get_mut_unchecked(mrc)};
+                    let success = m.try_enter(current_thread_number);
+                    if !success {
+                        thread.current_monitor = Some(mrc.clone());
+                        return Ok(()); // We have to block
+                    }
+                },
+            }
+        } 
+        if (actual_method.access_flags.flags & flags::method::ACC_NATIVE) > 0 {
+            return self.execute_native(&actual_method, actual_class);
+        } 
+        // TODO: Refactor self.setup_method_call() to handle native methods and synchronized ones (and rename it).
+        self.setup_method_call(&actual_method, actual_class, false)
+    }
+    pub fn invokestatic(&mut self) -> Result<(), Error> {
+        let thread = access_macros::current_thread_mut!(self);
+        let pc = thread.pc() + 1;
+        thread.inc_pc(3)?;
+        let frame = access_macros::current_frame_mut!(thread);
+        let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);     
+        let entry = frame.rt_const_pool.cp_entry(index)?;
+        let (method_ref, is_interface) = match entry {
+            Entry::MethodRef(refinfo) => (refinfo, false),
+            Entry::InterfaceMethodRef(refinfo) => (refinfo, true),
+            _ => return Err(Error::IllegalConstantLoad(Opcode::INVOKESTATIC)),
+        };
+        let current_class = Rc::clone(&frame.rt_const_pool);
+        let name_and_type = current_class.cp_entry(method_ref.name_and_type_index)?.as_name_and_type()?;
+        let name = current_class.cp_entry(name_and_type.name_index)?.as_utf8()?;
+        let descriptor = current_class.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
+        let c_info = current_class.cp_entry(method_ref.class_index)?.as_class()?;
+        let c_name = current_class.cp_entry(*c_info)?.as_utf8()?;
+        let mut c = self.resolve_class_reference(c_name)?;
+        if is_interface {
+            if !((c.access_flags().flags & flags::class::ACC_INTERFACE) > 0) {
+                return Err(Error::IncompatibleMethodRefAndClass(Opcode::INVOKESTATIC));
+            }
+        }
+        else {
+            if (c.access_flags().flags & flags::class::ACC_INTERFACE) > 0 {
+                return Err(Error::IncompatibleMethodRefAndClass(Opcode::INVOKESTATIC));
+            }
+        }
+        let mut method_to_call = None; 
+        // Resolve method
+        {
+            let mut found = false;
+            while c.has_super() && !found {
+                for method in c.methods() {
+                    // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
+                    // We still need to check for signature polymorphic functions.
+                    let method_descriptor = c.cp_entry(method.descriptor_index)?.as_utf8()?;
+                    if method_descriptor != descriptor {
+                        continue;
+                    }
+                    let method_name = c.cp_entry(method.name_index)?.as_utf8()?;
+                    if method_name == name {
+                        method_to_call = Some(method.clone());
+                        found = true;
+                        break;
+                    }
+                }   
+                // Recurse up the inheritance tree.
+                if !found {
+                    c = self.resolve_class_reference(c.super_name().unwrap())?;
+                }
                 
             }
             // TODO: Search Superinterfaces of c.
@@ -3305,18 +3587,19 @@ impl JVM {
             }
         }
         let method = method_to_call.unwrap();
-        if (method.access_flags.flags & flags::method::ACC_STATIC) > 0 {
+        if (method.access_flags.flags & flags::method::ACC_STATIC) == 0 {
             return Err(Error::IllegalMethodType(Opcode::INVOKESTATIC));
         } 
-        if (method.access_flags.flags & flags::method::ACC_ABSTRACT) == 0 {
+        if (method.access_flags.flags & flags::method::ACC_ABSTRACT) > 0 {
             return Err(Error::IllegalMethodType(Opcode::INVOKESTATIC));
         } 
         if (method.access_flags.flags & flags::method::ACC_SYNCHRONIZED) > 0 {
             // TODO: Enter monitors on Classes.
         } 
         if (method.access_flags.flags & flags::method::ACC_NATIVE) > 0 {
-            return self.execute_native(&method);
+            return self.execute_native(&method, c);
         } 
+        println!("Invoking static method {}{} in class {}", name, descriptor, c_name);
         self.setup_method_call(&method, c, true)
     }
     pub fn invokeinterface(&mut self) -> Result<(), Error> {
@@ -3324,7 +3607,7 @@ impl JVM {
     }
     pub fn invokedynamic(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(5)?; // the 5 is intentional
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
@@ -3364,17 +3647,22 @@ impl JVM {
     }
     pub fn new(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
-        let objectref = Reference::new_object(frame.rt_const_pool.clone(), index, &mut self.m_loaded_classes)?;
+        let current_class = frame.rt_const_pool.clone();
+        drop(frame);
+        drop(thread);
+        let objectref = Reference::new_object(current_class, index, self)?;
+        let thread = access_macros::current_thread_mut!(self);
+        let frame = access_macros::current_frame_mut!(thread);
         frame.op_stack.push(Value::Reference(Rc::new(objectref)));
         Ok(())
     }
     pub fn newarray(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(2)?;
         let frame = access_macros::current_frame_mut!(thread);
         let atype = frame.current_method.code()?[pc];
@@ -3393,7 +3681,7 @@ impl JVM {
     }
     pub fn anewarray(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
@@ -3423,11 +3711,8 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::ARRAYLENGTH)),
         };
-        let mut array_ref = array_val.as_reference()?;
-        let array_rc = match Rc::get_mut(&mut array_ref) {
-            Some(a_rc) => a_rc,
-            None => return Err(Error::DoubleMultableReference(Opcode::ARRAYLENGTH)),
-        };
+        let array_ref = array_val.as_reference()?;
+        let array_rc = &*array_ref;
         let array = match array_rc {
             Reference::Array(a, _) => a,
             Reference::Null => return Err(Error::NullPointerException(Opcode::ARRAYLENGTH)),
@@ -3447,22 +3732,23 @@ impl JVM {
                 return Err(Error::StackUnderflow(Opcode::ATHROW));
             }
             let objectref_rc = match &frame.op_stack[len - 1] {
-                Value::Reference(r) => r,
+                Value::Reference(r) => Rc::clone(r),
                 _ => return Err(Error::UnexpectedTypeOnStack(Opcode::ATHROW)),
             };
-            let objectref = &**objectref_rc;
+            let objectref = &*objectref_rc;
+            drop(frame);
+            drop(thread);            
             match objectref {
                 Reference::Array(_, _) | Reference::Interface(_, _) => return Err(Error::IncorrectReferenceType(Opcode::ATHROW)),
                 Reference::Null => {
                     // We could pop the other exception here, but we already clear it in self.handle_exception, so there's not really a point.
-                    let exception = {
-                        let loaded_ref = &mut self.m_loaded_classes;
-                        Object::new_with_name("java/Lang/NullPointerException", loaded_ref)?
-                    };
+                    let exception = Object::new_with_name("java/Lang/NullPointerException", self)?;
                     let exception_class = exception.m_class.clone();
                     let exception_ref = Reference::Object(exception, Rc::new(Monitor::new()));
                     let exception_rc = Rc::new(exception_ref);
                     let exception_val = Value::Reference(exception_rc);
+                    let thread = access_macros::current_thread_mut!(self);
+                    let frame = access_macros::current_frame_mut!(thread);
                     frame.op_stack.push(exception_val);
                     (true, Some(exception_class))
                 },
@@ -3477,7 +3763,7 @@ impl JVM {
     }
     pub fn checkcast(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
@@ -3497,9 +3783,12 @@ impl JVM {
             }
             Reference::Null => return Ok(()),
         };
-        let class_reference = *frame.rt_const_pool.cp_entry(index)?.as_class()?;
-        let class_desc = frame.rt_const_pool.cp_entry(class_reference)?.as_utf8()?.as_str();
-        if Self::check_class(&mut self.m_loaded_classes, object_desc, class_desc)? {
+        let class = Rc::clone(&frame.rt_const_pool);
+        let class_reference = *class.cp_entry(index)?.as_class()?;
+        let class_desc = class.cp_entry(class_reference)?.as_utf8()?.as_str();
+        drop(frame);
+        drop(thread);
+        if self.check_class(object_desc, class_desc)? {
             return Ok(());
         }
         Err(Error::ClassCastException(Opcode::CHECKCAST))
@@ -3507,7 +3796,7 @@ impl JVM {
     }
     pub fn instanceof(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
@@ -3532,12 +3821,19 @@ impl JVM {
                 return Ok(());
             },
         };
-        let class_reference = *frame.rt_const_pool.cp_entry(index)?.as_class()?;
-        let class_desc = frame.rt_const_pool.cp_entry(class_reference)?.as_utf8()?.as_str();
-        if Self::check_class(&mut self.m_loaded_classes, object_desc, class_desc)? {
+        let class = Rc::clone(&frame.rt_const_pool);
+        let class_reference = *class.cp_entry(index)?.as_class()?;
+        let class_desc = class.cp_entry(class_reference)?.as_utf8()?.as_str();
+        drop(frame);
+        drop(thread);
+        if self.check_class(object_desc, class_desc)? {
+            let thread = access_macros::current_thread_mut!(self);
+            let frame = access_macros::current_frame_mut!(thread);
             frame.op_stack.push(Value::Int(0));
             return Ok(());
         }
+        let thread = access_macros::current_thread_mut!(self);
+        let frame = access_macros::current_frame_mut!(thread);
         frame.op_stack.push(Value::Int(1));
         Ok(())
     }
@@ -3550,16 +3846,13 @@ impl JVM {
             Some(o) => o.as_reference()?,
             None => return Err(Error::StackUnderflow(Opcode::MONITORENTER)),
         };
-        let object = match Rc::get_mut(&mut objectref) {
-            Some(o) => o,
-            None => return Err(Error::DoubleMultableReference(Opcode::MONITORENTER)),
-        };
+        let object = unsafe { Rc::get_mut_unchecked(&mut objectref) };
         match object {
             Reference::Null => return Err(Error::NullPointerException(Opcode::MONITORENTER)),
             Reference::Array(_, mrc) | Reference::Interface(_, mrc) | Reference::Object(_, mrc) => {
                 let m = match Rc::get_mut(mrc) {
                     Some(m) => m,
-                    None => return Err(Error::DoubleMultableReferenceToMonitor(Opcode::MONITORENTER)),
+                    None => return Err(Error::DoubleMutableReferenceToMonitor(Opcode::MONITORENTER)),
                 };
                 let success = m.try_enter(current_thread_number);
                 if !success {
@@ -3580,14 +3873,14 @@ impl JVM {
         };
         let object = match Rc::get_mut(&mut objectref) {
             Some(o) => o,
-            None => return Err(Error::DoubleMultableReference(Opcode::MONITOREXIT)),
+            None => return Err(Error::DoubleMutableReference(Opcode::MONITOREXIT)),
         };
         match object {
             Reference::Null => return Err(Error::NullPointerException(Opcode::MONITOREXIT)),
             Reference::Array(_, mrc) | Reference::Interface(_, mrc) | Reference::Object(_, mrc) => {
                 let m = match Rc::get_mut(mrc) {
                     Some(m) => m,
-                    None => return Err(Error::DoubleMultableReferenceToMonitor(Opcode::MONITORENTER)),
+                    None => return Err(Error::DoubleMutableReferenceToMonitor(Opcode::MONITORENTER)),
                 };
                 let success = m.try_exit(current_thread_number);
                 if !success {
@@ -3603,7 +3896,7 @@ impl JVM {
     }
     pub fn multianewarray(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         thread.inc_pc(4)?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
@@ -3627,7 +3920,7 @@ impl JVM {
     }
     pub fn ifnull(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let offset = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
@@ -3647,7 +3940,7 @@ impl JVM {
     }
     pub fn ifnonnull(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let offset = {
             let frame = access_macros::current_frame_mut!(thread);
             let offset = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
@@ -3667,7 +3960,7 @@ impl JVM {
     }
     pub fn goto_w(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let boffset = {
             let frame = access_macros::current_frame_mut!(thread);
             let bbyte1 = frame.current_method.code()?[pc] as i32;
@@ -3681,7 +3974,7 @@ impl JVM {
     }
     pub fn jsr_w(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
-        let pc = thread.m_pc + 1;
+        let pc = thread.pc() + 1;
         let boffset = {
             let frame = access_macros::current_frame_mut!(thread);
             frame.op_stack.push(Value::ReturnAddress(pc as u16 + 2));

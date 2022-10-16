@@ -1,15 +1,16 @@
 use crate::reference::array::Array;
-use crate::{access_macros, class};
+use crate::access_macros;
 use crate::attributes::code::Exception;
 use crate::errorcodes::{Error, Opcode};
-use crate::class::{Class, MethodInfo};
+use crate::class::{Class, classfile::MethodInfo};
 use crate::constant_pool::Entry;
 use crate::frame::Frame;
-use crate::reference::{Reference, Monitor, array};
+use crate::reference::{Reference, Monitor};
 use crate::reference::object::Object;
 use crate::thread::Thread;
 use crate::value::{Value, VarValue};
 
+use core::panic;
 use std::collections::HashMap;
 use std::fs::{File, self};
 use std::io::Read;
@@ -21,6 +22,7 @@ use std::vec::Vec;
 
 // Just useful for code readability
 mod operations;
+mod instructions;
 pub mod settings;
 
 const STEP_SIZE: usize = 10;
@@ -32,11 +34,11 @@ pub struct Crash {
 } 
 
 pub struct JVM {
-    m_threads: Vec<Thread>,
-    pub m_loaded_classes: HashMap<String, Rc< Class>>,
+    pub m_threads: Vec<Thread>,
+    pub m_loaded_classes: HashMap<String, Rc<dyn Class>>,
     m_thrown_error: Error,
     m_crash_info: Crash,
-    m_thread_index: usize,
+    pub m_thread_index: usize,
     m_step_size: usize,
     m_has_halted: bool,
     m_main_class_name: String,
@@ -45,7 +47,7 @@ pub struct JVM {
 
 // TODO: Rework every dump function to use traits?
 
-impl<'a> JVM {
+impl JVM {
     pub fn new_jvm(n: String, flags: u8) -> JVM {
         JVM {
             m_threads: vec![Thread::new()
@@ -77,7 +79,7 @@ impl<'a> JVM {
             m_flags: flags,
         }
     }
-    pub fn new_with_main_class(c: Class, flags: u8) -> Result<JVM, Error> {
+    pub fn new_with_main_class<C: Class>(c: C, flags: u8) -> Result<JVM, Error> {
         let mut jvm = Self::new_jvm(String::from(c.name()), flags);
         let name = String::from(c.name());
         jvm.m_loaded_classes.insert(name, Rc::new(c));
@@ -99,7 +101,7 @@ impl<'a> JVM {
         }
         Ok(jvm)
     }
-    pub fn load_class_file(this_loaded_classes: &mut HashMap<String, Rc<Class>>, path: &str) -> Result<(), Error> {
+    pub fn load_class_file(&mut self, path: &str) -> Result<(), Error> {
         let mut resolved_path = String::from(path);
         if &path[0..4] == "java" {
             //TODO: Add java class path
@@ -108,13 +110,12 @@ impl<'a> JVM {
             temp_str.push_str(&resolved_path);
             resolved_path = temp_str;
         }
-        drop(path); // This is just to make sure we don't use it again, as it isn't correct.
         resolved_path.push_str(".class");
         let mut f = match File::open(resolved_path.as_str()) {
             Ok(file) => file,
             Err(_) => {
                 println!("Path: {}", path);
-                return Err(Error::NoClassDefFoundError(Opcode::ClassLoad))
+                return Err(Error::NoClassDefFoundError(Opcode::ClassLoad));
             },
         };
         let metadata = fs::metadata(&resolved_path).unwrap();
@@ -125,34 +126,46 @@ impl<'a> JVM {
             f.read(&mut buf_bytes).unwrap();
             Class::new(&buf_bytes)?
         };
-        this_loaded_classes.insert(String::from(c.name()), Rc::new(c));
+        let c_rc = Rc::new(c);
+        // Adding the class to the map here seems a bit weird, but if we don't we overflow the stack.
+        self.m_loaded_classes.insert(String::from(c_rc.name()), Rc::clone(&c_rc)); 
+        // clinit if a class has it.
+        let mut found_clinit = true;
+        if let Err(e) = self.setup_method_call_from_name_on_main("<clinit>", "()V", true) {
+            if e != Error::NoSuchMethodError(Opcode::MethodInvoke) {
+                return Err(e);
+            }
+            found_clinit = false;
+        }
+        if found_clinit {
+            self.run_until_method_exit();
+        }
+        // This is really hacky, but apparently sometimes we have to add special support to jdk classes.
+        if &path[0..4] == "java" {
+            if path == "java/lang/System" {
+                // After loading the system class, we have to call initPhase1() on it
+                self.setup_method_call_from_name("initPhase1", "()V", c_rc , true)?;
+                self.run_until_method_exit();
+            }
+        }
         Ok(())
     }
     // TODO ADD CLASSPATH
-    pub fn resolve_class_reference(this_loaded_classes: &mut HashMap<String, Rc<Class>>, reference: &str) -> Result<Rc<Class>, Error> {
-        if !this_loaded_classes.contains_key(reference) {
-            Self::load_class_file(this_loaded_classes, reference)?;
+    pub fn resolve_class_reference(&mut self, reference: &str) -> Result<Rc<dyn Class>, Error> {
+        if !self.m_loaded_classes.contains_key(reference) {
+            self.load_class_file(reference)?;
         }
-        Ok(this_loaded_classes.get(reference).unwrap().clone())
-    }
-    pub fn resolve_class_reference_mut(this_loaded_classes: &mut HashMap<String, Rc< Class>>, reference: &str) -> Result<Rc<Class>, Error> {
-        println!("Attemping to resolve {} mutably", reference);
-        println!("Currently loaded classes: {:#?}", this_loaded_classes);
-        Err(Error::NoClassDefFoundError(Opcode::ResolveClassRef))
-    }
-    // This is used for resolving references to Java internal classes (e.g. java.lang.String).
-    pub fn resolve_internal_class_reference(&self) -> Result<Rc<Class>, &'static str> {
-        Err("todo")
+        Ok(self.m_loaded_classes.get(reference).unwrap().clone())
     }
     // Use this for checking that the class derived is above the given class in the heiriarchy. 
-    pub fn resolve_with_derived_class(&self, reference: &str, derived: Rc<Class>) -> Result<Rc<Class>, &'static str> {
+    pub fn resolve_with_derived_class(&self, reference: &str, derived: Rc<dyn Class>) -> Result<Rc<dyn Class>, &'static str> {
         Err("todo")
     }
 
-    pub fn get_super(this_loaded_classes: &mut HashMap<String, Rc< Class>>, derived: Rc<Class>, level: usize) -> Option<Rc< Class>> {
+    pub fn get_super(this_loaded_classes: &mut HashMap<String, Rc<dyn Class>>, derived: Rc<dyn Class>, level: usize) -> Option<Rc<dyn Class>> {
         None
     }
-    pub fn get_direct_super(this_loaded_classes: &mut HashMap<String, Rc< Class>>, derived: Rc<Class>) -> Option<Rc< Class>> {
+    pub fn get_direct_super(this_loaded_classes: &mut HashMap<String, Rc<dyn Class>>, derived: Rc<dyn Class>) -> Option<Rc<dyn Class>> {
         Self::get_super(this_loaded_classes, derived, 1)
     }
     
@@ -172,7 +185,6 @@ impl<'a> JVM {
         // Used for checking whether to stop execution. 
         (self.m_thrown_error != Error::None) || self.m_crash_info.has_crashed   
     }
-    // TODO: Wide needs to be a setting on a thread, so that we don't contaminate across threads.
     pub fn step(&mut self, step_size: usize) {
         // First, before running the cycle, we check if the thread is waiting on a monitor. 
         // If it is, then we attempt to own it and check the result. If we don't own it, we can't progress, so we just exit.
@@ -187,7 +199,7 @@ impl<'a> JVM {
                 let monitor = match Rc::get_mut(&mut monitor_rc) {
                     Some(m) => m,
                     None => {
-                        self.m_thrown_error = Error::DoubleMultableReferenceToMonitor(Opcode::BlockedThread);
+                        self.m_thrown_error = Error::DoubleMutableReferenceToMonitor(Opcode::BlockedThread);
                         return;
                     },
                 };
@@ -225,13 +237,22 @@ impl<'a> JVM {
             }
             if self.m_crash_info.has_crashed {
                 println!("JVM Crashing due to error {}", self.m_crash_info.crash_reason);
-                // TODO: Implement stack unwinding.
-                println!("Stack Trace:");
-                for frame in &access_macros::current_thread_mut!(self).m_stack {
-                    let current_class = &frame.rt_const_pool;
-                    // TODO: Fix these unwrap calls.
-                    println!("Method name: {}, Method descriptor: {}", current_class.cp_entry(frame.current_method.name_index).unwrap().as_utf8().unwrap(),
-                    current_class.cp_entry(frame.current_method.descriptor_index).unwrap().as_utf8().unwrap());
+                if (self.m_flags & settings::SHOULD_BACKTRACE) > 0 {
+                    println!("Backtrace:");
+                    for frame in access_macros::current_thread_mut!(self).m_stack.iter().rev() {
+                        let current_class = &frame.rt_const_pool;
+                        // TODO: Fix these unwrap calls.
+                        println!("Method name: {}, Method descriptor: {}, Method class: {}", current_class.cp_entry(frame.current_method.name_index).unwrap().as_utf8().unwrap(),
+                        current_class.cp_entry(frame.current_method.descriptor_index).unwrap().as_utf8().unwrap(), current_class.name());
+                        println!("Local variables:");
+                        for local in frame.local_variables.iter().rev() {
+                            println!("  {:#?}", local);
+                        }
+                        println!("Operand stack:");
+                        for operand in frame.op_stack.iter().rev() {
+                            println!("  {:#?}", operand);
+                        }
+                    }
                 }
                 return;
             }
@@ -530,14 +551,14 @@ impl<'a> JVM {
 // This could be made more readable if we used the S, T, SC, and TC names like the jvm spec.
 // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-6.html#jvms-6.5.instanceof
 impl JVM {
-    pub fn check_class(this_loaded_classes: &mut HashMap<String, Rc<Class>>, object_desc: &str, class_desc: &str) -> Result<bool, Error> {
+    pub fn check_class(&mut self, object_desc: &str, class_desc: &str) -> Result<bool, Error> {
         match object_desc.as_bytes()[0] as char {
             'L' => {
                 match class_desc.as_bytes()[0] as char {
                     'L' => {
                         // First, resolve class and object.
-                        let object = access_macros::resolve_class_reference!(*this_loaded_classes, object_desc)?;
-                        let class = access_macros::resolve_class_reference!(*this_loaded_classes, class_desc)?;
+                        let object = self.resolve_class_reference(object_desc)?;
+                        let class = self.resolve_class_reference(class_desc)?;
                         match class.is_interface() {
                             true => {
                                 // If class is an interface, then object must implement class.
@@ -560,7 +581,7 @@ impl JVM {
                                     }
                                     let super_name_index = current_class.cp_entry(current_class.super_index().unwrap())?.as_class()?;
                                     let super_name = current_class.cp_entry(*super_name_index)?.as_utf8()?;
-                                    current_class = access_macros::resolve_class_reference!(*this_loaded_classes, super_name.as_str())?;
+                                    current_class = self.resolve_class_reference(super_name.as_str())?;
                                 }
                                 Ok(false)
                             }
@@ -573,7 +594,7 @@ impl JVM {
             '[' => {
                 match class_desc.as_bytes()[0] as char {
                     'L' => {
-                        let class = access_macros::resolve_class_reference!(*this_loaded_classes, class_desc)?;
+                        let class = self.resolve_class_reference(class_desc)?;
                         match class.is_interface() {
                             true => {
                                 // If class is an interface, it has to be an interface implemented by arrays. 
@@ -595,7 +616,7 @@ impl JVM {
                             if !((class_component.as_bytes()[0] as char == 'L') | (class_component.as_bytes()[0] as char == '[')) {
                                 return Err(Error::IllegalDescriptor); // Either object and class are both primitive or both references.
                             }
-                            return Self::check_class(this_loaded_classes, object_component, class_component);
+                            return self.check_class(object_component, class_component);
                         }
                         if (class_component.as_bytes()[0] as char == 'L') | (class_component.as_bytes()[0] as char == '[') {
                             return Err(Error::IllegalDescriptor); // Either object and class are both primitive or both references.
@@ -610,41 +631,43 @@ impl JVM {
     }   
 }
 
-impl<'a> JVM {
+impl JVM {
     // This functions contains lots of redundant checks that should be removed.
     pub fn handle_exception(&mut self) -> Result<(), Error> {
         {
             // This function doesn't actually check for any exception that could be thrown by athrow. 
             // athrow has to check its own exceptions, and create any that could occur.
-            let loaded_classes = &mut self.m_loaded_classes;
             let thread = access_macros::current_thread_mut!(self);
-            let current_pc = thread.m_pc;
+            let current_pc = thread.pc();
             let exception = {
                 let frame: &mut Frame = access_macros::current_frame_mut!(thread);
                 let len = frame.op_stack.len();
                 if len == 0 {
                     return Err(Error::StackUnderflow(Opcode::ExceptionHandle));
                 }
-                let exception_rc = frame.op_stack[len - 1].as_reference().unwrap(); // We should check the soundness of this cast before calling.
+                let exception_rc = frame.op_stack[len - 1].as_reference().unwrap().clone(); // We should check the soundness of this cast before calling.
                 let exception: &Object = match &*exception_rc { // This should also be ensured by the caller.
                     Reference::Array(_, _) | Reference::Interface(_, _) | Reference::Null => return Err(Error::IncorrectReferenceType(Opcode::ExceptionHandle)),
                     Reference::Object(o, _) => &o,
                 };
-                let code = match &frame.current_method.code {
+                let code = match frame.current_method.code.clone() {
                     Some(c) => c,
                     None => unreachable!(), // Should be unreachable, because methods that don't have code can't have exceptions anyway.
                 };
+                let current_class = frame.rt_const_pool.clone();
+                // We have to drop these references, because it's possible we modify the frame/thread state when resolving classes.
+                drop(frame);
+                drop(thread);
                 for ex_handler in &code.exception_table {
                     if (current_pc >= ex_handler.start_pc as usize) && (current_pc < ex_handler.end_pc as usize) {
                         let catches_this = {
                             if ex_handler.catch_type == 0 {
                                 true // This catches all exceptions
                             }
-                            else {
-                                let current_class = frame.rt_const_pool.clone();
+                            else {                           
                                 let catch_class_name_index = *current_class.cp_entry(ex_handler.catch_type)?.as_class()?;
                                 let catch_class_name = current_class.cp_entry(catch_class_name_index)?.as_utf8()?;
-                                let catch_class = access_macros::resolve_class_reference!(*loaded_classes, catch_class_name.as_str())?;
+                                let catch_class = self.resolve_class_reference(catch_class_name.as_str())?;
                                 // Check if exception refers to catch_class or one of its subclasses
                                 let exception_class = exception.m_class.clone();
                                 let mut current_exception_class = exception_class;
@@ -654,13 +677,16 @@ impl<'a> JVM {
                                         ret_flag = true;
                                         break;
                                     }
-                                    current_exception_class = access_macros::resolve_class_reference!(*loaded_classes, current_exception_class.super_name().unwrap())?;
+                                    current_exception_class = self.resolve_class_reference(current_exception_class.super_name().unwrap())?;
                                 }
                                 ret_flag
                             }
                         };
                         if catches_this {
-                            access_macros::set_pc!(thread, ex_handler.handler_pc as usize, frame.current_method.code()?.len())?;
+                            // Reaquire the frame
+                            let thread = access_macros::current_thread_mut!(self);
+                            let frame = access_macros::current_frame_mut!(thread);
+                            frame.pc = ex_handler.handler_pc as usize;
                             // Discard all values except for the exception
                             let exception_val = frame.op_stack.pop().unwrap();
                             frame.op_stack.clear();
@@ -672,9 +698,12 @@ impl<'a> JVM {
                 }
                 // If we're here, we haven't found an exception handler.
                 // In this case, we give back the exception we had.
+                let thread = access_macros::current_thread_mut!(self);
+                let frame = access_macros::current_frame_mut!(thread);
                 frame.op_stack.pop().unwrap()
             };
             // If we found no exception handler, pass it down the call chain
+            let thread = access_macros::current_thread_mut!(self);
             let _ = thread.m_stack.pop();
             if thread.m_stack.len() > 0 {
                 // Continue down the call chain
@@ -689,11 +718,10 @@ impl<'a> JVM {
         Ok(())
 
     }    
-    pub fn setup_method_call_from_name(&mut self, name: &str, descriptor: &str, mut current_class: Rc< Class>, is_static: bool)  -> Result<(), Error> {
+    pub fn setup_method_call_from_name(&mut self, name: &str, descriptor: &str, mut current_class: Rc<dyn Class>, is_static: bool)  -> Result<(), Error> {
         let mut method_to_call = None; 
         {
             let mut found = false;
-            let loaded_classes = &mut self.m_loaded_classes;
             while current_class.has_super() && !found {
                 for method in current_class.methods() {
                     // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
@@ -711,7 +739,7 @@ impl<'a> JVM {
                 }   
                 // Recurse up the inheritance tree.
                 if !found { 
-                    current_class = access_macros::resolve_class_reference!(self.m_loaded_classes, current_class.super_name().unwrap())?; 
+                    current_class = self.resolve_class_reference(current_class.super_name().unwrap())?;
                 }
                 
             }
@@ -721,11 +749,11 @@ impl<'a> JVM {
             }
         };
         // Call into the actual setup method
-        self.setup_method_call(&method_to_call.unwrap(), current_class, is_static,)
+        self.setup_method_call(&method_to_call.unwrap(), current_class, is_static)
     }
     pub fn setup_method_call_from_name_on_main(&mut self, name: &str, descriptor: &str, is_static: bool)  -> Result<(), Error> {
-        let main_class_name = &self.m_main_class_name;
-        let mut current_class = access_macros::resolve_class_reference!(self.m_loaded_classes, main_class_name)?;
+        let main_class_name = self.m_main_class_name.clone();
+        let mut current_class = self.resolve_class_reference(&main_class_name)?;
         let mut method_to_call = None; 
         {
             let mut found = false;
@@ -746,7 +774,7 @@ impl<'a> JVM {
                 }   
                 // Recurse up the inheritance tree.
                 if !found { 
-                    current_class = access_macros::resolve_class_reference!(self.m_loaded_classes, current_class.super_name().unwrap())?; 
+                    current_class = self.resolve_class_reference(current_class.super_name().unwrap())?;
                 }
                 
             }
@@ -758,21 +786,20 @@ impl<'a> JVM {
         // Call into the actual setup method
         self.setup_method_call(&method_to_call.unwrap(), current_class, is_static)
     }
-    pub fn setup_method_call(&mut self, method: &MethodInfo, c: Rc< Class>, is_static: bool) -> Result<(), Error> {
+    pub fn setup_method_call(&mut self, method: &MethodInfo, c: Rc<dyn Class>, is_static: bool) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
         let mut new_frame = Frame::new(c.clone(), method.clone());
         // Fill out the local variables.
-        // There's an error here with accessing the method descriptor
         let mut descriptor: &str = c.cp_entry(method.descriptor_index)?.as_utf8()?;
         descriptor = &descriptor[0..descriptor.find(")").unwrap()]; // Skip past the return value
-        descriptor = &descriptor[1..]; // Skip the beginning paranthesis.
+        descriptor = &descriptor[1..]; // Skip the beginning parenthesis.
         let locals = &mut new_frame.local_variables;
         while descriptor.len() > 0 {
             let mut index = descriptor.len() - 1;
             if &descriptor[index..] == ";" {
                 index = descriptor.rfind('L').unwrap();
             }
-            if &descriptor[index - 1..index] == "[" {
+            if (index > 0) && &descriptor[index - 1..index] == "[" {
                 // There is a better way of doing this, FIXME.
                 descriptor = &descriptor[..index];
                 index -= 1;
@@ -828,6 +855,7 @@ impl<'a> JVM {
                     let inner_value = Value::to_int(val)?;
                     locals.push(VarValue::Int(inner_value));
                     descriptor = &descriptor[..index];
+                    
                 },
                 "J" => {
                     let current_frame = access_macros::current_frame_mut!(thread);
@@ -911,10 +939,116 @@ impl<'a> JVM {
             locals.push(VarValue::Reference(inner_ref));
         }
         locals.reverse(); // We have to push the variables in reverse order, so we correct it after.
+        
         thread.push_frame(new_frame);
+        println!("Invoking {}{} in class {}", c.cp_entry(method.name_index)?.as_utf8()?, descriptor, c.name());
         Ok(())
     }
-    pub fn execute_native(&mut self, method: &MethodInfo    ) -> Result<(), Error> {
-        Err(Error::UnsatisfiedLinkError(Opcode::MethodInvoke))
+    pub fn execute_native_from_name(&mut self, name: &str, descriptor: &str, mut current_class: Rc<dyn Class>) -> Result<(), Error> {
+        let mut method_to_call = None; 
+        {
+            let mut found = false;
+            while current_class.has_super() && !found {
+                for method in current_class.methods() {
+                    // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
+                    // We still need to check for signature polymorphic functions.
+                    let method_descriptor = current_class.cp_entry(method.descriptor_index)?.as_utf8()?;
+                    if method_descriptor != descriptor {
+                        continue;
+                    }
+                    let method_name = current_class.cp_entry(method.name_index)?.as_utf8()?;
+                    if method_name == name {
+                        method_to_call = Some(method.clone());
+                        found = true;
+                        break;
+                    }
+                }   
+                // Recurse up the inheritance tree.
+                if !found { 
+                    current_class = self.resolve_class_reference(current_class.super_name().unwrap())?; 
+                }
+                
+            }
+            // TODO: Search Superinterfaces of c.
+            if !found {
+                return Err(Error::NoSuchMethodError(Opcode::MethodInvoke));
+            }
+        };
+        // Call into the actual setup method
+        self.execute_native(&method_to_call.unwrap(), current_class)
+    }
+    pub fn execute_native(&mut self, method: &MethodInfo, current_class: Rc<dyn Class>) -> Result<(), Error> {
+        let mname = current_class.cp_entry(method.name_index)?.as_utf8()?;
+        let mdesc = current_class.cp_entry(method.descriptor_index)?.as_utf8()?;
+        let cname = current_class.name();
+        match cname {
+            "java/lang/String" => {
+                match mname.as_str() {
+                    "intern" => {
+                        // Intern isn't polymorpohic, so we can ignore the descriptor.
+                        // This function is supposed to take a String object, see if we already have one, if we do give a reference to it, 
+                        // if not, give it back and add it to the pool.
+                        // It *should* be fine to just always give the object back.
+                        Ok(())
+                    },
+                    _ => Err(Error::UnsatisfiedLinkError(Opcode::MethodInvoke, mname.clone()))
+                }
+            },
+            _ => Err(Error::UnsatisfiedLinkError(Opcode::MethodInvoke, mname.clone()))
+        }    
+    }
+}
+
+impl JVM {
+    pub fn parse_descriptor<'a>(desc: &'a String) -> Result<(&'a [&str], &'a str), Error> {
+        panic!("todo");
+    }
+    pub fn box_primitive_name(&mut self, sym: &str) -> Result<&str, Error> {
+        match sym {
+            "B" => Ok("java/lang/Byte"),
+            "C" => Ok("java/lang/Char"),
+            "D" => Ok("java/lang/Double"),
+            "F" => Ok("java/lang/Float"),
+            "I" => Ok("java/lang/Int"),
+            "J" => Ok("java/lang/Long"),
+            "S" => Ok("java/lang/Short"),
+            "Z" => Ok("java/lang/Boolean"),
+            _ => Err(Error::IllegalDescriptor),
+        }
+    }
+    pub fn gen_class_obj(&mut self, name: &str) -> Result<(), Error> {
+        // We have to create an instance of the class. 
+        // To do this we call the private constructor with the classloader and the array component type
+        // Since we don't have class loaders, this is always null for now
+        let loader = Value::Reference(Rc::new(Reference::Null));
+        let thread = access_macros::current_thread_mut!(self);
+        let frame = access_macros::current_frame_mut!(thread);
+        frame.op_stack.push(loader);
+        {
+            if &name[0..1] == "[" {
+                let mut idx = 1;
+                while &name[idx..idx+1] == "[" {
+                    idx += 1;
+                }
+                if &name[idx..idx+1] == "L" {
+                    let comp_name = &name[idx + 1..];
+                    self.gen_class_obj(comp_name)?; // Puts the comp type on the stack
+                }
+                else {
+                    // NOTE: This might be incorrect behavior. 
+                    // It's possible that when we encounter a primitive type, we shouldn't box it into a class
+                    // For now we do, it makes things easier
+                    self.gen_class_obj(self.box_primitive_name(&name[idx..idx+1])?)?;
+                }
+            }
+            else { 
+                frame.op_stack.push(Value::Reference(Rc::new(Reference::Null)));
+            }
+        };
+        // This may not work right, idk how exactly it should work. This will probably need explicit support from the vm in the future.
+        let class_class = self.resolve_class_reference("java/lang/Class")?;
+        self.setup_method_call_from_name("<init>", "(Ljava/lang/ClassLoader;Ljava/lang/Class;)V", class_class, true)?;
+        self.run_until_method_exit();
+        Ok(())
     }
 }

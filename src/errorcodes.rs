@@ -212,17 +212,19 @@ pub enum Opcode {
     BlockedThread,
     ExceptionHandle,
     MethodInvoke,
+    NewObject,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
     AbstractMethodCodeAccess,
+    AbstractMethodError(Opcode),
     ArithmeticException(Opcode),
     ArrayIndexOutOfBoundsException(Opcode),
     Breakpoint,
     ClassCastException(Opcode),
-    DoubleMultableReference(Opcode),
-    DoubleMultableReferenceToMonitor(Opcode),
+    DoubleMutableReference(Opcode),
+    DoubleMutableReferenceToMonitor(Opcode),
     FrameStackUnderflow(Opcode),
     ImpDep1,
     ImpDep2,
@@ -266,6 +268,7 @@ pub enum Error {
     IllegalReferenceForThrow,
     IllegalReferenceKind,
     IllegalVerificationType,
+    IllegalWide,
     IncompatibleClassChangeError(Opcode),
     IncompatibleDimensionalityAndDescriptor,
     IncompatibleMethodRefAndClass(Opcode),
@@ -288,7 +291,7 @@ pub enum Error {
     StackUnderflow(Opcode),
     Todo(Opcode),
     UnexpectedTypeOnStack(Opcode),
-    UnsatisfiedLinkError(Opcode),
+    UnsatisfiedLinkError(Opcode, String),
     Wide,
     // Used for signaling that an exception was thrown.
     Exception,

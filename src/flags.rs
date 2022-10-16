@@ -1,6 +1,7 @@
 // TODO: Implment BitAnd for these types.
 pub mod class {
     use std::fmt;
+    use std::ops::BitAnd;
 
     pub const ACC_PUBLIC: u16 = 0x0001;
     pub const ACC_FINAL: u16 = 0x0010;
@@ -54,10 +55,17 @@ pub mod class {
             write!(f, "{}", text)
         }
     }
+    impl BitAnd<u16> for AccessFlags {
+        type Output = bool;
+        fn bitand(self, rhs: u16) -> Self::Output {
+            (self.flags & rhs) > 0 
+        }
+    }
 }
 
 pub mod field {
     use std::fmt;
+    use std::ops::BitAnd;
 
     pub const ACC_PUBLIC: u16 = 0x0001;
     pub const ACC_PRIVATE: u16 = 0x0002;
@@ -111,10 +119,17 @@ pub mod field {
             write!(f, "{}", text)
         }
     }
+    impl BitAnd<u16> for AccessFlags {
+        type Output = bool;
+        fn bitand(self, rhs: u16) -> Self::Output {
+            (self.flags & rhs) > 0 
+        }
+    }
 }
 
 pub mod method {
     use std::fmt;
+    use std::ops::BitAnd;
 
     pub const ACC_PUBLIC: u16 = 0x0001;
     pub const ACC_PRIVATE: u16 = 0x0002;
@@ -182,6 +197,12 @@ pub mod method {
                 text.remove(0);
             }
             write!(f, "{}", text)
+        }
+    }
+    impl BitAnd<u16> for AccessFlags {
+        type Output = bool;
+        fn bitand(self, rhs: u16) -> Self::Output {
+            (self.flags & rhs) > 0 
         }
     }
 }

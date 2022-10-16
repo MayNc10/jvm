@@ -6,14 +6,18 @@
 
 // Idea: Consider using alloc::borrow::Cow to keep stack values.
 // https://doc.rust-lang.org/nightly/alloc/borrow/enum.Cow.html
+use std::fmt;
 use std::result::Result;
 use std::rc::Rc;
+use std::str::EncodeUtf16;
 
+use crate::class::Class;
 use crate::errorcodes::Error;
 use crate::reference;
+use crate::reference::object::Object;
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum Value {
+#[derive(Clone, PartialEq)]
+pub enum Value<C: Class + ?Sized, O: Object + ?Sized> {
     Byte(i32),
     Short(i32),
     Int(i32),
@@ -22,10 +26,39 @@ pub enum Value {
     Float(f32),
     Double(f64),
     ReturnAddress(u16),
-    Reference(Rc<reference::Reference>)
+    Reference(reference::Reference<C, O>)
 }
 
-impl Value {
+impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Display for Value<C, O> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Byte(b) => write!(f, "Byte {}", b),
+            Value::Short(s) => write!(f, "Short {}", s),
+            Value::Int(i) => write!(f, "Int {}", i),
+            Value::Long(l) => write!(f, "Long {}", l),
+            Value::Char(c) => write!(f, "Char {}", c),
+            Value::Float(float) => write!(f, "Float {}", float),
+            Value::Double(d) => write!(f, "Double {}", d),
+            Value::ReturnAddress(addr) => write!(f, "ReturnAddress {}", addr),
+            Value::Reference(r) => {
+                match &**r {
+                    reference::Reference::Null => write!(f, "Null Reference"),
+                    reference::Reference::Array(_a, _) => write!(f, "Array Reference"), // TODO: Add component type.
+                    reference::Reference::Interface(i, _) => write!(f, "Interface Reference of class {}", i.name()),
+                    reference::Reference::Object(o, _) => write!(f, "Object Reference of class {}", o.m_class.name()),
+                }
+            }
+        }
+    }
+}
+
+impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Debug for Value<C, O> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+impl<C: Class + ?Sized, O: Object + ?Sized> Value<C, O> {
     pub fn as_int(&self) -> Result<&i32, Error> {
         match self {
             Value::Byte(i) | Value::Short(i) | Value::Int(i) | Value::Char(i) => Ok(i),
@@ -56,7 +89,7 @@ impl Value {
         }
         Err(Error::IllegalCastToReturnAddress)
     }
-    pub fn as_reference(&self) -> Result<Rc<reference:: Reference>, Error> {
+    pub fn as_reference(&self) -> Result<Rc<reference:: Reference<C, O>>, Error> {
         if let Value::Reference(reference) = self {
             return Ok(reference.clone());
         }
@@ -93,14 +126,14 @@ impl Value {
         }
         Err(Error::IllegalCastToReturnAddress)
     }
-    pub fn as_reference_mut(&mut self) -> Result<Rc<reference:: Reference>, Error> {
+    pub fn as_reference_mut(&mut self) -> Result<Rc<reference:: Reference<C, O>>, Error> {
         if let Value::Reference(reference) = self {
             return Ok(reference.clone());
         }
         Err(Error::IllegalCastToReference)
     }
 
-    pub fn new(descriptor: &str) -> Value {
+    pub fn new(descriptor: &str) -> Value<C, O> {
         // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-4.html#jvms-4.2.2
         // Because we aren't parsing a full type, we can just look at the first character
 
@@ -121,7 +154,7 @@ impl Value {
 
 }
 
-impl Value {
+impl<C: Class + ?Sized, O: Object + ?Sized> Value<C, O> {
     pub fn is_int(&self) -> bool {
         match self {
             Value::Byte(_) | Value::Short(_) | Value::Int(_) | Value::Char(_) => true,
@@ -158,53 +191,53 @@ impl Value {
             _ => false,
         }
     }
-    pub fn to_int(val: Value) -> Result<i32, Error> {
-        match val {
+    pub fn to_int(self) -> Result<i32, Error> {
+        match self {
             Value::Byte(i) | Value::Short(i) | Value::Int(i) | Value::Char(i) => Ok(i),
            _ => Err(Error::IllegalCastToInt),
         }
     }
-    pub fn to_long(val: Value) -> Result<i64, Error> {
-        if let Value::Long(l) = val {
+    pub fn to_long(self) -> Result<i64, Error> {
+        if let Value::Long(l) = self {
             return Ok(l);
         }
         Err(Error::IllegalCastToLong)
     }
-    pub fn to_float(val: Value) -> Result<f32, Error> {
-        if let Value::Float(f) = val {
+    pub fn to_float(self) -> Result<f32, Error> {
+        if let Value::Float(f) = self {
             return Ok(f);
         }
         Err(Error::IllegalCastToFloat)
     }
-    pub fn to_double(val: Value) -> Result<f64, Error> {
-        if let Value::Double(d) = val {
+    pub fn to_double(self) -> Result<f64, Error> {
+        if let Value::Double(d) = self {
             return Ok(d);
         }
         Err(Error::IllegalCastToDouble)
     }
-    pub fn to_retaddr(val: Value) -> Result<u16, Error> {
-        if let Value::ReturnAddress(addr) = val {
+    pub fn to_retaddr(self) -> Result<u16, Error> {
+        if let Value::ReturnAddress(addr) = self {
             return Ok(addr);
         }
         Err(Error::IllegalCastToReturnAddress)
     }
-    pub fn to_reference(val: Value) -> Result<Rc<reference::Reference>, Error> {
-        if let Value::Reference(reference) = val {
+    pub fn to_reference(self) -> Result<Rc<reference::Reference<C, O>>, Error> {
+        if let Value::Reference(reference) = self {
             return Ok(reference);
         }
         Err(Error::IllegalCastToReference)
     }
 
     pub fn is_comptype1(&self) -> bool {
-        self.is_long() || self.is_double()
+        !self.is_comptype2()
     }
     pub fn is_comptype2(&self) -> bool {
-        !self.is_comptype1()
+        self.is_long() || self.is_double()
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum VarValue {
+#[derive(Clone)]
+pub enum VarValue<C: Class + ?Sized, O: Object + ?Sized> {
     Byte(i32),
     Short(i32),
     Int(i32),
@@ -215,10 +248,11 @@ pub enum VarValue {
     Double(f64),
     DoubleHighBytes,
     ReturnAddress(u16),
-    Reference(Rc<reference:: Reference>)
+    Reference(reference::Reference<C, O>),
+    Uninit,
 }
 
-impl<'a> VarValue {
+impl<C: Class + ?Sized, O: Object + ?Sized> VarValue<C, O> {
     pub fn as_int(&self) -> Result<&i32, Error> {
         match self {
             VarValue::Byte(i) | VarValue::Short(i) | VarValue::Int(i) | VarValue::Char(i) => Ok(i),
@@ -249,7 +283,7 @@ impl<'a> VarValue {
         }
         Err(Error::IllegalCastToReturnAddress)
     }
-    pub fn as_reference(&self) -> Result<Rc<reference:: Reference>, Error> {
+    pub fn as_reference(&self) -> Result<Rc<reference:: Reference<C, O>>, Error> {
         if let VarValue::Reference(reference) = self {
             return Ok(reference.clone());
         }
@@ -286,14 +320,14 @@ impl<'a> VarValue {
         }
         Err(Error::IllegalCastToReturnAddress)
     }
-    pub fn as_reference_mut(&mut self) -> Result<Rc<reference:: Reference>, Error> {
+    pub fn as_reference_mut(&mut self) -> Result<Rc<reference:: Reference<C, O>>, Error> {
         if let VarValue::Reference(reference) = self {
             return Ok(reference.clone());
         }
         Err(Error::IllegalCastToReference)
     }
 
-    pub fn new(descriptor: &str) -> VarValue {
+    pub fn new(descriptor: &str) -> VarValue<C, O> {
         // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-4.html#jvms-4.2.2
         // Because we aren't parsing a full type, we can just look at the first character
 
@@ -314,5 +348,36 @@ impl<'a> VarValue {
 
 }
 
+impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Display for VarValue<C, O> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VarValue::Byte(b) => write!(f, "Byte {}", b),
+            VarValue::Short(s) => write!(f, "Short {}", s),
+            VarValue::Int(i) => write!(f, "Int {}", i),
+            VarValue::Long(l) => write!(f, "Long {}", l),
+            VarValue::LongHighBytes => write!(f, "LongHighBytes"),
+            VarValue::Char(c) => write!(f, "Char {}", c),
+            VarValue::Float(float) => write!(f, "Float {}", float),
+            VarValue::Double(d) => write!(f, "Double {}", d),
+            VarValue::DoubleHighBytes => write!(f, "DoubleHighBytes"),
+            VarValue::ReturnAddress(addr) => write!(f, "ReturnAddress {}", addr),
+            VarValue::Reference(r) => {
+                match &**r {
+                    reference::Reference::Null => write!(f, "Null Reference"),
+                    reference::Reference::Array(_a, _) => write!(f, "Array Reference"), // TODO: Add component type.
+                    reference::Reference::Interface(i, _) => write!(f, "Interface Reference of class {}", i.name()),
+                    reference::Reference::Object(o, _) => write!(f, "Object Reference of class {}", o.m_class.name()),
+                }
+            }
+            VarValue::Uninit => write!(f, "Uninitialized"),
+        }
+    }
+}
+
+impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Debug for VarValue<C, O> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
 
 

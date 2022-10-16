@@ -51,16 +51,22 @@ pub fn parse_args(args: &[String]) -> Result<Cli, ParseError> {
         ftype = FileType::Jar;
     }
     if args.contains(&String::from("-ac")) {
-        flags &= jvm::settings::SHOULD_CONTROL_ACCESS;
+        flags |= jvm::settings::SHOULD_CONTROL_ACCESS;
     }
     if args.contains(&String::from("--access-control")) {
-        flags &= jvm::settings::SHOULD_CONTROL_ACCESS;
+        flags |= jvm::settings::SHOULD_CONTROL_ACCESS;
     }
     if args.contains(&String::from("-v")) {
-        flags &= jvm::settings::SHOULD_VERIFY;
+        flags |= jvm::settings::SHOULD_VERIFY;
     }
     if args.contains(&String::from("--verify")) {
-        flags &= jvm::settings::SHOULD_VERIFY;
+        flags |= jvm::settings::SHOULD_VERIFY;
+    }
+    if args.contains(&String::from("-db")) {
+        flags |= jvm::settings::SHOULD_BACKTRACE;
+    }
+    if args.contains(&String::from("--dump-backtrace")) {
+        flags |= jvm::settings::SHOULD_BACKTRACE;
     }
     if let Some(sindex) = args.iter().position(|s| s == "-cp") {
         if args.len() == sindex + 1 {

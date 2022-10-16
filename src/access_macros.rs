@@ -12,11 +12,11 @@ macro_rules! set_pc {
         if $new_pc > $max_pc {
             return Err(Error::ProgramCounterOverflow);
         }
-        $this.m_pc = $new_pc;
+        $this.m_stack.last_mut().unwrap().pc = $new_pc;
         Ok(())
     })
 }
-pub (crate) use set_pc;
+//pub (crate) use set_pc;
 
 #[macro_export]
 macro_rules! current_frame_mut {
@@ -27,6 +27,7 @@ macro_rules! current_frame_mut {
 }
 pub (crate) use current_frame_mut;
 
+/* 
 #[macro_export]
 macro_rules! resolve_class_reference {
     ($this_loaded_classes:expr, $reference:expr) => ({
@@ -41,3 +42,4 @@ macro_rules! resolve_class_reference {
     })
 }
 pub (crate) use resolve_class_reference;
+*/

@@ -129,10 +129,8 @@ impl fmt::Display for Code {
                     code_index += 1;
                 },
                 17 => {
-                    let num = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let num = unsafe {
+                        i16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())   
                     };
                     writeln!(f, "sipush {}", num)?;
                     code_index += 2;
@@ -142,19 +140,15 @@ impl fmt::Display for Code {
                     code_index += 1;
                 },
                 19 => {
-                    let num = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let num = unsafe {
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())   
                     };
                     writeln!(f, "ldc_w #{}", num)?;
                     code_index += 2;
                 },
                 20 => {
-                    let num = {
-                        let b1 = self.code[code_index + 1] as u16;
-                        let b2 = self.code[code_index + 2] as u16;
-                        b1 << 8 + b2
+                    let num = unsafe {
+                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())   
                     };
                     writeln!(f, "ldc2_w #{}", num)?;
                     code_index += 2;

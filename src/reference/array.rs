@@ -2,24 +2,26 @@ use std::marker::PhantomData;
 use std::result::Result;
 use std::rc::Rc;
 
+use super::object::Object;
 use super::{Reference, Monitor};
 
 // A packed boolean array is more memory efficient, but slightly slower. 
 // Maybe we'll use them, maybe we won't. We'll see.
 // use super::packedboolarray::PackedBoolArray;
 
+use crate::class::Class;
 use crate::errorcodes::{Error, Opcode};
 use crate::value::Value;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct RefArray {
-    pub arr: Vec<Reference>,
+pub struct RefArray<C: Class + ?Sized, O: Object + ?Sized> {
+    pub arr: Vec<Reference<C, O>>,
     // This descriptor could be massively improved by making it a recursive enum. For now, this works.
     pub descriptor: String, 
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Array {
+pub enum Array<C: Class + ?Sized, O: Object + ?Sized> {
     Bool(Vec<bool>),
     Char(Vec<u16>),
     Float(Vec<f32>),
@@ -28,7 +30,7 @@ pub enum Array {
     Short(Vec<i16>),
     Int(Vec<i32>),
     Long(Vec<i64>),
-    Ref(RefArray),
+    Ref(RefArray<C, O>),
 }
 
 // This could be an enum, but this also works (and is, I think, simpler)
@@ -47,8 +49,8 @@ pub mod atype {
 
 // Currently we store a reference directly, instead of using an Rc(). 
 // I think this makes sense, but I'm not 100% confident that that is the way it's supposed to be.
-impl<'a>  Array {
-    pub fn new(size: usize, atype: u8) ->  Array {
+impl<C: Class + ?Sized, O: Object + ?Sized> Array<C, O> {
+    pub fn new(size: usize, atype: u8) -> Array<C, O> {
         match atype {
             atype::T_BOOLEAN => Array::new_bool(size),
             atype::T_CHAR => Array::new_char(size),
@@ -64,63 +66,63 @@ impl<'a>  Array {
 
     // In order to make these type-safe, all the vectors must be initialized.
 
-    pub fn new_bool(size: usize) ->  Array {
+    pub fn new_bool(size: usize) -> Array<C, O> {
         let mut v = Vec::with_capacity(size);
         for _ in 0..size {
             v.push(false);
         }
         Array::Bool(v)
     }
-    pub fn new_char(size: usize) ->  Array {
+    pub fn new_char(size: usize) -> Array<C, O> {
         let mut v = Vec::with_capacity(size);
         for _ in 0..size {
             v.push(0);
         }
         Array::Char(v)
     }
-    pub fn new_float(size: usize) ->  Array {
+    pub fn new_float(size: usize) -> Array<C, O> {
         let mut v = Vec::with_capacity(size);
         for _ in 0..size {
             v.push(0.0);
         }
         Array::Float(v)
     }
-    pub fn new_double(size: usize) ->  Array {
+    pub fn new_double(size: usize) -> Array<C, O> {
         let mut v = Vec::with_capacity(size);
         for _ in 0..size {
             v.push(0.0);
         }
         Array::Double(v)
     }
-    pub fn new_byte(size: usize) ->  Array {
+    pub fn new_byte(size: usize) -> Array<C, O> {
         let mut v = Vec::with_capacity(size);
         for _ in 0..size {
             v.push(0);
         }
         Array::Byte(v)
     }
-    pub fn new_short(size: usize) ->  Array {
+    pub fn new_short(size: usize) -> Array<C, O> {
         let mut v = Vec::with_capacity(size);
         for _ in 0..size {
             v.push(0);
         }
         Array::Short(v)
     }
-    pub fn new_int(size: usize) ->  Array {
+    pub fn new_int(size: usize) -> Array<C, O> {
         let mut v = Vec::with_capacity(size);
         for _ in 0..size {
             v.push(0);
         }
         Array::Int(v)
     }
-    pub fn new_long(size: usize) ->  Array {
+    pub fn new_long(size: usize) -> Array<C, O> {
         let mut v = Vec::with_capacity(size);
         for _ in 0..size {
             v.push(0);
         }
         Array::Long(v)
     }
-    pub fn new_ref(size: usize, descriptor: String) ->  Array {
+    pub fn new_ref(size: usize, descriptor: String) -> Array<C, O> {
         let mut v = Vec::with_capacity(size);
         for _ in 0..size {
             v.push(Reference::Null);
@@ -148,7 +150,15 @@ impl<'a>  Array {
 
 
 // Making dimension start as a usize makes the code more readable.
-fn fill_multi_level<'a>(dimension: usize, dimension_cap: usize, counts: &[Value], base_type: u8, descriptor: String) -> Result< Array, Error> {
+// In this case I think we can make CC a parameterized type, because all the Values should have the same type.
+// This is because they all represent ints, so the only valid Class type for them to be is all java/lang/Integer.
+fn fill_multi_level<C, O, CC, OO>(dimension: usize, dimension_cap: usize, counts: &[Value<CC, OO>], base_type: u8, descriptor: String) -> Result<Array<C, O> , Error> 
+where   
+    C: Class + ?Sized,
+    O: Object + ?Sized,
+    CC: Class + ?Sized,
+    OO: Object + ?Sized,
+{
     if (dimension + 1) == dimension_cap {
         if base_type == atype::T_REF {
             return Ok(Array::new_ref(*counts[dimension].as_int()? as usize, descriptor));
@@ -170,8 +180,13 @@ fn fill_multi_level<'a>(dimension: usize, dimension_cap: usize, counts: &[Value]
     
 } 
 
-impl<'a>  Array {
-    pub fn new_multi(dimensions: u8, counts: &[Value], descriptor: String) -> Result< Array, Error> {
+impl<C: Class + ?Sized, O: Object + ?Sized> Array<C, O> {
+    // same reason as fill_multi_level
+    pub fn new_multi<CC, OO>(dimensions: u8, counts: &[Value<CC, OO>], descriptor: String) -> Result<Array<C, O>, Error> 
+    where   
+        CC: Class + ?Sized,
+        OO: Object + ?Sized,
+    {
         // First, verify descriptor makes sense.
         fn size_and_base(descriptor: &str, base_count: u8) -> (u8, char) {
             match descriptor.as_bytes()[0] as char {
@@ -199,8 +214,8 @@ impl<'a>  Array {
     } 
 }
 
-impl<'a>   Array {
-    pub fn get(&self, index: usize) ->  Value {
+impl<C: Class + ?Sized, O: Object + ?Sized> Array<C, O> {
+    pub fn get(&self, index: usize) -> Value<C, O> {
         match self {
             // As per https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-2.html, bool is accessed using byte array instructions. 
             // Therefore, this case returns a Value byte.
@@ -234,7 +249,8 @@ impl<'a>   Array {
 
         }
     }
-    pub fn set(&mut self, index: usize, val:  Value) -> Result<(), Error> {
+    // This might have to be a dyn class once we start checking assignment compatability (if we are supposed to).
+    pub fn set(&mut self, index: usize, val: Value<C, O>) -> Result<(), Error> {
         match self {
             // As per https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-2.html, bool is accessed using byte array instructions. 
             // Therefore, this case returns a Value byte.
@@ -274,7 +290,7 @@ impl<'a>   Array {
                 let mut rcref = val.as_reference()?;
                 let reference = match Rc::get_mut(&mut rcref) {
                     Some(r) => r,
-                    None => return Err(Error::DoubleMultableReference(Opcode::ArrayGet)),
+                    None => return Err(Error::DoubleMutableReference(Opcode::ArrayGet)),
                 };
                 refarray.arr[index] = reference.clone();
                 Ok(())

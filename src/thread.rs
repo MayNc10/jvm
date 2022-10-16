@@ -1,16 +1,17 @@
 use std::rc::Rc;
 use std::vec::Vec;
 
+use crate::class::Class;
 use crate::errorcodes::Error;
 use crate::frame::Frame;
 use crate::reference::Monitor;
+use crate::reference::object::Object;
 use crate::value::{Value, VarValue};
 
 
 // FIXME: Because we access the length so much, should we just store it?
 
 pub struct Thread {
-    pub m_pc: usize, // This has to be usize in order to index Vecs.
     pub m_stack: Vec<Frame>,
     // This is a bad name, but I can't think of a better one right now.
     // This could be an unsafe mutable pointer, because we only modify if we're the only owner, and we (will) modify it atomically.
@@ -41,7 +42,7 @@ impl Thread {
         self.m_stack.push(frame);
     }
     #[inline] pub fn pc(&self) -> usize {
-        self.m_pc
+        self.m_stack.last().unwrap().pc
     }
     #[inline] pub fn set_pc(&mut self, new_pc: usize) -> Result<(), Error> {
         let max_pc = {
@@ -50,29 +51,29 @@ impl Thread {
         if new_pc > max_pc {
             return Err(Error::ProgramCounterOverflow);
         }
-        self.m_pc = new_pc;
+        self.m_stack.last_mut().unwrap().pc = new_pc;
         Ok(())
     }
     #[inline] pub fn inc_pc(&mut self, added_pc: isize) -> Result<(), Error> {
         let max_pc = {
             self.current_frame().current_method.code()?.len() as isize
         };
-        if self.m_pc as isize + added_pc > max_pc {
+        if self.m_stack.last().unwrap().pc as isize + added_pc > max_pc {
             return Err(Error::ProgramCounterOverflow);
         }
-        self.m_pc = (self.m_pc as isize + added_pc) as usize;
+        self.m_stack.last_mut().unwrap().pc = (self.m_stack.last().unwrap().pc as isize + added_pc) as usize;
         Ok(())
     }
-    #[inline] pub fn push_op(&mut self, op:  Value) {
+    #[inline] pub fn push_op(&mut self, op:  Value<dyn Class, dyn Object>) {
         let length = self.m_stack.len();
         let op_len = self.m_stack[length - 1].op_stack.len();
         self.m_stack[length-1].op_stack[op_len-1] = op;
     } 
-    #[inline] pub fn pop_op(&mut self) -> Option<Value> {
+    #[inline] pub fn pop_op(&mut self) -> Option<Value<dyn Class, dyn Object>> {
         let length = self.m_stack.len();
         self.m_stack[length - 1].op_stack.pop()
     }
-    #[inline] pub fn push_var(&mut self, var: VarValue) {
+    #[inline] pub fn push_var(&mut self, var: VarValue<dyn Class, dyn Object>) {
         let length = self.m_stack.len();
         let var_len = self.m_stack[length - 1].local_variables.len();
         self.m_stack[length-1].local_variables[var_len-1] = var;
@@ -80,6 +81,6 @@ impl Thread {
 } 
 impl<'a> Thread {
     pub fn new() -> Thread {
-        Thread { m_pc: 0, m_stack: Vec::new(), current_monitor: None, next_instruction_is_wide: false }
+        Thread {m_stack: Vec::new(), current_monitor: None, next_instruction_is_wide: false }
     }
 }

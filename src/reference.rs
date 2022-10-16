@@ -2,6 +2,7 @@ pub mod array;
 pub mod object; 
 pub mod packedboolarray;
 
+use crate::jvm::JVM;
 use crate::reference::array::Array;
 use crate::class::Class;
 use crate::errorcodes::Error;
@@ -51,35 +52,36 @@ impl Monitor {
     }
 }
 
+// We might want to have all these types hold their own monitors.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Reference {
+pub enum Reference<C: Class + ?Sized, O: Object + ?Sized> {
     Null,
-    Array(Array, Rc<Monitor>),
-    Interface(Rc<Class>, Rc<Monitor>), // As far as I can tell, Interfaces are just special classes, and so can just use the Class type.
-    Object(Object, Rc<Monitor>),
+    Array(Rc<Array<C, O>>, Rc<Monitor>),
+    Interface(Rc<C>, Rc<Monitor>), // As far as I can tell, Interfaces are just special classes, and so can just use the Class type.
+    Object(Rc<O>, Rc<Monitor>),
 }
 
 // Should we make a wrapper for Array::new_multi?
 
-impl<'a>  Reference {
-    pub fn new() ->  Reference {
+impl<C: Class, O: Object>  Reference<C, O> {
+    pub fn new() -> Reference<C, O> {
         Reference::Null
     }
-    pub fn new_refarray(size: usize, descriptor: String) ->  Reference {
-        Reference::Array(Array::new_ref(size, descriptor), Rc::new(Monitor::new()))
+    pub fn new_refarray(size: usize, descriptor: String) -> Reference<C, O> {
+        Reference::Array(Rc::new(Array::new_ref(size, descriptor)), Rc::new(Monitor::new()))
     }
-    pub fn new_array(size: usize, atype: u8) ->  Reference {
-        Reference::Array(Array::new(size, atype), Rc::new(Monitor::new()))
+    pub fn new_array(size: usize, atype: u8) ->  Reference<C, O> {
+        Reference::Array(Rc::new(Array::new(size, atype)), Rc::new(Monitor::new()))
     }
-    pub fn new_interface(c: Rc< Class>) ->  Reference {
+    pub fn new_interface(c: Rc<C>) ->  Reference<C, O> {
         Reference::Interface(c, Rc::new(Monitor::new()))
     }
-    pub fn new_object(current_class: Rc<Class>, class_index: u16, loaded_classses: &'a mut HashMap<String, Rc< Class>>) -> Result< Reference, Error> {
-        Ok(Reference::Object(Object::new(current_class, class_index, loaded_classses)?, Rc::new(Monitor::new())))
+    pub fn new_object<CC: Class>(current_class: Rc<CC>, class_index: u16, jvm: &mut JVM) -> Result< Reference<C, O>, Error> {
+        Ok(Reference::Object(Rc::new(Object::new(current_class, class_index, jvm)?), Rc::new(Monitor::new())))
     }
 
     // Again, the runtime hit hurts, but we need to test while the design is still unstable, and I can't think of a better solution. 
-    pub fn to_refarray(reference: Reference, size: usize, descriptor: String) -> Result<Reference, Error> {
+    pub fn to_refarray(reference: Reference<C, O>, size: usize, descriptor: String) -> Result<Reference<C, O>, Error> {
         // As far as I understand it, this should make ref illegal to use after this function.
         match reference {
             Reference::Null => Ok(Reference::new_refarray(size, descriptor)),
@@ -87,7 +89,7 @@ impl<'a>  Reference {
         }
     }
 
-    pub fn to_interface(reference: Reference, c: Rc< Class>) -> Result< Reference, Error> {
+    pub fn to_interface<CC: Class>(reference: Reference<C, O>, c: Rc<CC>) -> Result<Reference<CC, O>, Error> {
         match reference {
             Reference::Null => Ok(Reference::new_interface(c)),
             _ => Err(Error::IllegalReferenceCastToInterface),
@@ -95,9 +97,9 @@ impl<'a>  Reference {
     }
 
 
-    pub fn to_object(reference: Reference, current_class: Rc<Class>, class_index: u16, loaded_classses: &'a mut HashMap<String, Rc< Class>>) -> Result< Reference, Error> {
+    pub fn to_object<CC: Class, OO: Object>(reference: Reference<C, O>, current_class: Rc<CC>, class_index: u16, jvm: &mut JVM) -> Result<Reference<C, OO>, Error> {
         match reference {
-            Reference::Null => Ok(Reference::new_object(current_class, class_index, loaded_classses)?),
+            Reference::Null => Ok(Reference::new_object(current_class, class_index, jvm)?),
             _  => Err(Error::IllegalReferenceCastToObject),
         }
     }

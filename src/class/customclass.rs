@@ -109,11 +109,14 @@ impl<'a> Class for CustomClass {
         }
         Err(Error::NoSuchFieldError(Opcode::PUTSTATIC))
     }
-    fn exec_method<C: Class>(&mut self, current_method_class: Rc<C>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
+    fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
         
     }
     fn get_class_file(&self) -> Rc<ClassFile> {
         self.class_file.clone()
+    }
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn Class> {
+        self
     }
 }
 

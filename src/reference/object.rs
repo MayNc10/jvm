@@ -12,7 +12,7 @@ pub trait Object {
     // Should create a new object, and init its fields with zeros.
     fn new(current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Self, Error> where Self: Sized;
     // Needed for CustomObject, but this should never be called on a native object.
-    fn new_with_name(name: &str, jvm: &mut JVM) -> Result<CustomObject<dyn Class>, Error>  where Self : Sized {
+    fn new_with_name(name: &str, jvm: &mut JVM) -> Result<Box<dyn Object>, Error> where Self : Sized {
         match name {
             _ => customobject::CustomObject::<dyn Class>::new_with_name(name, jvm)
         }
@@ -29,4 +29,5 @@ pub trait Object {
     fn as_any(&self) -> &dyn Any {
         &self
     }
+    fn into_any_rc(self: Rc<Self>) -> Rc<dyn Object>;
 }

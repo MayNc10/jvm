@@ -14,8 +14,9 @@ pub trait Class {
     fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error>; // Figure out what else to pass
     fn get_class_file(&self) -> Rc<ClassFile>;
     fn as_any(&self) ->  &dyn Any {
-        self
+        &self
     }
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn Class>;
 }
 
 pub fn new_class(jvm: &mut JVM, file: classfile::ClassFile) -> Result<Rc<dyn Class>, Error> 

@@ -62,7 +62,7 @@ impl<C: Class + ?Sized> Object for CustomObject<C> {
             instance_vars: map,
         })
     }
-    fn new_with_name(name: &str, jvm: &mut JVM) -> Result<CustomObject<dyn Class>, Error> {
+    fn new_with_name(name: &str, jvm: &mut JVM) -> Result<Box<dyn Object>, Error> {
         // Now, we resolve the instance variables of the class.
         // This resolution is recursive, because for each class we also have to resolve the fields of its superclasses.
         // To do this, we use this helper function.
@@ -149,14 +149,16 @@ impl<C: Class + ?Sized> Object for CustomObject<C> {
         };
         match self.instance_vars.insert(name_and_type, value) {
             Some(_) => Ok(()),
-            None => Err(Error::NoSuchFieldError(Opcode::GETFIELD)),
+            None => Err(Error::NoSuchFieldError(Opcode::PUTFIELD)),
         }
     }
     fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
         todo!("exec method customclass")
     }
-    fn class(&self) -> Rc<C> {
-        self.class.clone()
+    fn class(&self) -> Rc<dyn Class> {
+       Rc::clone(&self.class).as_any_rc() 
+    }
+    fn into_any_rc(self: Rc<Self>) -> Rc<dyn Object> {
+        self
     }
 }
-

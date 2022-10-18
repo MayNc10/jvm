@@ -137,7 +137,7 @@ impl<C: Class + ?Sized> Object for CustomObject<C> {
         // This code is for verifing that the class the field is for is the same as this class. 
         let class_ref = *current_method_class.get_class_file().cp_entry(field_ref.class_index)?.as_class()?;
         let class_name = current_method_class.get_class_file().cp_entry(class_ref)?.as_utf8()?;
-        if &self.class.as_dyn_rc() != &jvm.resolve_class_reference(class_name)? {
+        if Rc::ptr_eq(&self.class.as_dyn_rc(), &jvm.resolve_class_reference(class_name)?) {
             return Err(Error::IncompatibleObjectAndField(String::from(self.class.get_class_file().name()), String::from(class_name)));
         }
         let name_and_type_info = current_method_class.get_class_file().cp_entry(field_ref.name_and_type_index)?.as_name_and_type()?;

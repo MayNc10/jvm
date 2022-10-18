@@ -19,6 +19,7 @@ pub trait Class {
     fn as_dyn_rc(self: Rc<Self>) -> Rc<dyn Class>;
 }
 
+/* 
 impl PartialEq for dyn Class {
     fn eq(&self, other: &Self) -> bool {
         self.get_class_file() == other.get_class_file()
@@ -27,6 +28,7 @@ impl PartialEq for dyn Class {
         self.get_class_file() != other.get_class_file()
     }
 }
+*/
 
 pub fn new_class(jvm: &mut JVM, file: classfile::ClassFile) -> Result<Rc<dyn Class>, Error> {
     match file.name() {

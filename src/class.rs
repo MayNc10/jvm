@@ -33,3 +33,10 @@ pub fn new_class(jvm: &mut JVM, file: classfile::ClassFile) -> Result<Rc<dyn Cla
         _ => Ok(Rc::new(customclass::CustomClass::new(jvm, file)?))
     }
 }
+
+pub fn eq<C: Class + ?Sized>(first: &Rc<C>, other: &Rc<dyn Class>) -> bool {
+    match other.as_any().downcast_ref::<C>() {
+        Some(_) => true, // This should always be true, but it could break
+        None => false,
+    }
+}

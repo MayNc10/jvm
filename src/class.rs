@@ -16,12 +16,19 @@ pub trait Class {
     fn as_any(&self) ->  &dyn Any {
         &self
     }
-    fn as_any_rc(self: Rc<Self>) -> Rc<dyn Class>;
+    fn as_dyn_rc(self: Rc<Self>) -> Rc<dyn Class>;
 }
 
 pub fn new_class(jvm: &mut JVM, file: classfile::ClassFile) -> Result<Rc<dyn Class>, Error> 
 {
     match file.name() {
         _ => Ok(Rc::new(customclass::CustomClass::new(jvm, file)?))
+    }
+}
+
+pub fn eq<C: Class + ?Sized>(first: &Rc<C>, other: &Rc<dyn Class>) -> bool {
+    match other.as_any().downcast_ref::<C>() {
+        Some(_) => true, // This should always be true, but it could break
+        None => false,
     }
 }

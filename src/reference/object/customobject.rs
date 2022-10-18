@@ -2,7 +2,7 @@ use std::rc::Rc;
 use std::result::Result;
 use std::collections::HashMap;
 
-use crate::access_macros;
+use crate::{access_macros, class};
 use crate::class::classfile::ClassFile;
 use crate::class::{Class, classfile::*};
 use crate::constant_pool::{NameAndTypeInfo, NameAndType};
@@ -137,7 +137,7 @@ impl<C: Class + ?Sized> Object for CustomObject<C> {
         // This code is for verifing that the class the field is for is the same as this class. 
         let class_ref = *current_method_class.get_class_file().cp_entry(field_ref.class_index)?.as_class()?;
         let class_name = current_method_class.get_class_file().cp_entry(class_ref)?.as_utf8()?;
-        if *self.class != *jvm.resolve_class_reference(class_name)? {
+        if &self.class.as_dyn_rc() != &jvm.resolve_class_reference(class_name)? {
             return Err(Error::IncompatibleObjectAndField(String::from(self.class.get_class_file().name()), String::from(class_name)));
         }
         let name_and_type_info = current_method_class.get_class_file().cp_entry(field_ref.name_and_type_index)?.as_name_and_type()?;
@@ -156,7 +156,7 @@ impl<C: Class + ?Sized> Object for CustomObject<C> {
         todo!("exec method customclass")
     }
     fn class(&self) -> Rc<dyn Class> {
-       Rc::clone(&self.class).as_any_rc() 
+       Rc::clone(&self.class).as_dyn_rc() 
     }
     fn into_any_rc(self: Rc<Self>) -> Rc<dyn Object> {
         self

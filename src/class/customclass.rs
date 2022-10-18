@@ -115,7 +115,7 @@ impl<'a> Class for CustomClass {
     fn get_class_file(&self) -> Rc<ClassFile> {
         self.class_file.clone()
     }
-    fn as_any_rc(self: Rc<Self>) -> Rc<dyn Class> {
+    fn as_dyn_rc(self: Rc<Self>) -> Rc<dyn Class> {
         self
     }
 }

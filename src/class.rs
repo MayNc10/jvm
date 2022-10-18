@@ -16,11 +16,19 @@ pub trait Class {
     fn as_any(&self) ->  &dyn Any {
         &self
     }
-    fn as_any_rc(self: Rc<Self>) -> Rc<dyn Class>;
+    fn as_dyn_rc(self: Rc<Self>) -> Rc<dyn Class>;
 }
 
-pub fn new_class(jvm: &mut JVM, file: classfile::ClassFile) -> Result<Rc<dyn Class>, Error> 
-{
+impl PartialEq for dyn Class {
+    fn eq(&self, other: &Self) -> bool {
+        self.get_class_file() == other.get_class_file()
+    }
+    fn ne(&self, other: &Self) -> bool {
+        self.get_class_file() != other.get_class_file()
+    }
+}
+
+pub fn new_class(jvm: &mut JVM, file: classfile::ClassFile) -> Result<Rc<dyn Class>, Error> {
     match file.name() {
         _ => Ok(Rc::new(customclass::CustomClass::new(jvm, file)?))
     }

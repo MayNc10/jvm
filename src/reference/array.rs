@@ -13,14 +13,14 @@ use crate::class::Class;
 use crate::errorcodes::{Error, Opcode};
 use crate::value::Value;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RefArray<C: Class + ?Sized, O: Object + ?Sized> {
     pub arr: Vec<Reference<C, O>>,
     // This descriptor could be massively improved by making it a recursive enum. For now, this works.
     pub descriptor: String, 
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Array<C: Class + ?Sized, O: Object + ?Sized> {
     Bool(Vec<bool>),
     Char(Vec<u16>),
@@ -173,7 +173,7 @@ where
     for index in 0..size {
         let mut new_desciptor = descriptor.clone();
         new_desciptor.remove(0);
-        let _ = arr.set(index, Value::Reference(Rc::new(Reference::Array(fill_multi_level(dimension + 1, dimension_cap, counts, base_type, new_desciptor)?, Rc::new(Monitor::new())))));
+        let _ = arr.set(index, Value::Reference(Reference::Array(Rc::new(fill_multi_level(dimension + 1, dimension_cap, counts, base_type, new_desciptor)?), Rc::new(Monitor::new()))));
     }
     Ok(arr)
     
@@ -244,7 +244,7 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Array<C, O> {
                 Value::Double(dvec[index])
             }
             Array::Ref(refarray) => {
-                Value::Reference(Rc::new(refarray.arr[index].clone()))
+                Value::Reference(refarray.arr[index].clone())
             }
 
         }
@@ -287,11 +287,7 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Array<C, O> {
                 Ok(())
             }
             Array::Ref(refarray) => {
-                let mut rcref = val.as_reference()?;
-                let reference = match Rc::get_mut(&mut rcref) {
-                    Some(r) => r,
-                    None => return Err(Error::DoubleMutableReference(Opcode::ArrayGet)),
-                };
+                let mut reference = val.as_reference()?;
                 refarray.arr[index] = reference.clone();
                 Ok(())
             }

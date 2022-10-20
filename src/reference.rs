@@ -11,6 +11,8 @@ use crate::reference::object::Object;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use self::object::customobject::CustomObject;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Monitor {
     pub owned_thread: usize,
@@ -53,7 +55,7 @@ impl Monitor {
 }
 
 // We might want to have all these types hold their own monitors.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Reference<C: Class + ?Sized, O: Object + ?Sized> {
     Null,
     Array(Rc<Array<C, O>>, Rc<Monitor>),
@@ -61,9 +63,20 @@ pub enum Reference<C: Class + ?Sized, O: Object + ?Sized> {
     Object(Rc<O>, Rc<Monitor>),
 }
 
+impl<C: Class + ?Sized, O: Object + ?Sized> Clone for Reference<C, O> {
+    fn clone(&self) -> Self {
+        match self {
+            Reference::Null => Reference::Null,
+            Reference::Array(a, m) => Reference::Array(Rc::clone(a),Rc::clone(m)),
+            Reference::Interface(i, m) => Reference::Interface(Rc::clone(i),Rc::clone(m)),
+            Reference::Object(o, m) => Reference::Object(Rc::clone(o),Rc::clone(m)),
+        }
+    }
+}
+
 // Should we make a wrapper for Array::new_multi?
 
-impl<C: Class, O: Object>  Reference<C, O> {
+impl<C: Class + ?Sized, O: Object + ?Sized>  Reference<C, O> {
     pub fn new() -> Reference<C, O> {
         Reference::Null
     }
@@ -76,8 +89,8 @@ impl<C: Class, O: Object>  Reference<C, O> {
     pub fn new_interface(c: Rc<C>) ->  Reference<C, O> {
         Reference::Interface(c, Rc::new(Monitor::new()))
     }
-    pub fn new_object<CC: Class>(current_class: Rc<CC>, class_index: u16, jvm: &mut JVM) -> Result< Reference<C, O>, Error> {
-        Ok(Reference::Object(Rc::new(Object::new(current_class, class_index, jvm)?), Rc::new(Monitor::new())))
+    pub fn new_object(current_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Reference<dyn Class, dyn Object>, Error> {
+        Ok(Reference::Object(CustomObject::<dyn Class>::new(current_class, class_index, jvm)?, Rc::new(Monitor::new())))
     }
 
     // Again, the runtime hit hurts, but we need to test while the design is still unstable, and I can't think of a better solution. 
@@ -97,9 +110,9 @@ impl<C: Class, O: Object>  Reference<C, O> {
     }
 
 
-    pub fn to_object<CC: Class, OO: Object>(reference: Reference<C, O>, current_class: Rc<CC>, class_index: u16, jvm: &mut JVM) -> Result<Reference<C, OO>, Error> {
+    pub fn to_object(reference: Reference<dyn Class, dyn Object>, current_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Reference<dyn Class, dyn Object>, Error> {
         match reference {
-            Reference::Null => Ok(Reference::new_object(current_class, class_index, jvm)?),
+            Reference::Null => Ok(Reference::<dyn Class, dyn Object>::new_object(current_class, class_index, jvm)?),
             _  => Err(Error::IllegalReferenceCastToObject),
         }
     }

@@ -16,7 +16,7 @@ use crate::errorcodes::Error;
 use crate::reference;
 use crate::reference::object::Object;
 
-#[derive(Clone, PartialEq)]
+#[derive(PartialEq)]
 pub enum Value<C: Class + ?Sized, O: Object + ?Sized> {
     Byte(i32),
     Short(i32),
@@ -41,11 +41,11 @@ impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Display for Value<C, O> {
             Value::Double(d) => write!(f, "Double {}", d),
             Value::ReturnAddress(addr) => write!(f, "ReturnAddress {}", addr),
             Value::Reference(r) => {
-                match &**r {
+                match r {
                     reference::Reference::Null => write!(f, "Null Reference"),
                     reference::Reference::Array(_a, _) => write!(f, "Array Reference"), // TODO: Add component type.
-                    reference::Reference::Interface(i, _) => write!(f, "Interface Reference of class {}", i.name()),
-                    reference::Reference::Object(o, _) => write!(f, "Object Reference of class {}", o.m_class.name()),
+                    reference::Reference::Interface(i, _) => write!(f, "Interface Reference of class {}", i.get_class_file().name()),
+                    reference::Reference::Object(o, _) => write!(f, "Object Reference of class {}", o.class().get_class_file().name()),
                 }
             }
         }
@@ -89,7 +89,7 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Value<C, O> {
         }
         Err(Error::IllegalCastToReturnAddress)
     }
-    pub fn as_reference(&self) -> Result<Rc<reference:: Reference<C, O>>, Error> {
+    pub fn as_reference(&self) -> Result<reference:: Reference<C, O>, Error> {
         if let Value::Reference(reference) = self {
             return Ok(reference.clone());
         }
@@ -126,7 +126,7 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Value<C, O> {
         }
         Err(Error::IllegalCastToReturnAddress)
     }
-    pub fn as_reference_mut(&mut self) -> Result<Rc<reference:: Reference<C, O>>, Error> {
+    pub fn as_reference_mut(&mut self) -> Result<reference:: Reference<C, O>, Error> {
         if let Value::Reference(reference) = self {
             return Ok(reference.clone());
         }
@@ -147,7 +147,7 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Value<C, O> {
             73 => Value::Int(0),
             74 => Value::Long(0),
             83 => Value::Short(0),
-            76 | 91 => Value::Reference(Rc::new(reference::Reference::Null)), // We don't care about the full type, just that it's a reference. 
+            76 | 91 => Value::Reference(reference::Reference::Null), // We don't care about the full type, just that it's a reference. 
             _ => panic!("Type descriptor contains illegal first character: {}", descriptor.as_bytes()[0]),
         }
     }
@@ -221,7 +221,7 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Value<C, O> {
         }
         Err(Error::IllegalCastToReturnAddress)
     }
-    pub fn to_reference(self) -> Result<Rc<reference::Reference<C, O>>, Error> {
+    pub fn to_reference(self) -> Result<reference::Reference<C, O>, Error> {
         if let Value::Reference(reference) = self {
             return Ok(reference);
         }
@@ -236,7 +236,23 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Value<C, O> {
     }
 }
 
-#[derive(Clone)]
+impl<C: Class + ?Sized, O: Object + ?Sized> Clone for Value<C, O> {
+    fn clone(&self) -> Self {
+        match self {
+            Value::Byte(b) => Value::Byte(*b),
+            Value::Short(s) => Value::Short(*s),
+            Value::Int(i) => Value::Int(*i),
+            Value::Long(l) => Value::Long(*l),
+            Value::Char(c) => Value::Char(*c),
+            Value::Float(f) => Value::Float(*f),
+            Value::Double(d) => Value::Double(*d),
+            Value::ReturnAddress(r) => Value::ReturnAddress(*r),
+            Value::Reference(r) => Value::Reference(r.clone())
+        }
+    }
+}
+
+#[derive(PartialEq)]
 pub enum VarValue<C: Class + ?Sized, O: Object + ?Sized> {
     Byte(i32),
     Short(i32),
@@ -283,7 +299,7 @@ impl<C: Class + ?Sized, O: Object + ?Sized> VarValue<C, O> {
         }
         Err(Error::IllegalCastToReturnAddress)
     }
-    pub fn as_reference(&self) -> Result<Rc<reference:: Reference<C, O>>, Error> {
+    pub fn as_reference(&self) -> Result<reference:: Reference<C, O>, Error> {
         if let VarValue::Reference(reference) = self {
             return Ok(reference.clone());
         }
@@ -320,7 +336,7 @@ impl<C: Class + ?Sized, O: Object + ?Sized> VarValue<C, O> {
         }
         Err(Error::IllegalCastToReturnAddress)
     }
-    pub fn as_reference_mut(&mut self) -> Result<Rc<reference:: Reference<C, O>>, Error> {
+    pub fn as_reference_mut(&mut self) -> Result<reference:: Reference<C, O>, Error> {
         if let VarValue::Reference(reference) = self {
             return Ok(reference.clone());
         }
@@ -341,7 +357,7 @@ impl<C: Class + ?Sized, O: Object + ?Sized> VarValue<C, O> {
             73 => VarValue::Int(0),
             74 => VarValue::Long(0),
             83 => VarValue::Short(0),
-            76 | 91 => VarValue::Reference(Rc::new(reference::Reference::Null)), // We don't care about the full type, just that it's a reference. 
+            76 | 91 => VarValue::Reference(reference::Reference::Null), // We don't care about the full type, just that it's a reference. 
             _ => panic!("Type descriptor contains illegal first character: {}", descriptor.as_bytes()[0]),
         }
     }
@@ -362,11 +378,11 @@ impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Display for VarValue<C, O> {
             VarValue::DoubleHighBytes => write!(f, "DoubleHighBytes"),
             VarValue::ReturnAddress(addr) => write!(f, "ReturnAddress {}", addr),
             VarValue::Reference(r) => {
-                match &**r {
+                match r {
                     reference::Reference::Null => write!(f, "Null Reference"),
                     reference::Reference::Array(_a, _) => write!(f, "Array Reference"), // TODO: Add component type.
-                    reference::Reference::Interface(i, _) => write!(f, "Interface Reference of class {}", i.name()),
-                    reference::Reference::Object(o, _) => write!(f, "Object Reference of class {}", o.m_class.name()),
+                    reference::Reference::Interface(i, _) => write!(f, "Interface Reference of class {}", i.get_class_file().name()),
+                    reference::Reference::Object(o, _) => write!(f, "Object Reference of class {}", o.class().get_class_file().name()),
                 }
             }
             VarValue::Uninit => write!(f, "Uninitialized"),
@@ -377,6 +393,25 @@ impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Display for VarValue<C, O> {
 impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Debug for VarValue<C, O> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self)
+    }
+}
+
+impl<C: Class + ?Sized, O: Object + ?Sized> Clone for VarValue<C, O> {
+    fn clone(&self) -> Self {
+        match self {
+            VarValue::Byte(b) => VarValue::Byte(*b),
+            VarValue::Short(s) => VarValue::Short(*s),
+            VarValue::Int(i) => VarValue::Int(*i),
+            VarValue::Long(l) => VarValue::Long(*l),
+            VarValue::LongHighBytes => VarValue::LongHighBytes,
+            VarValue::Char(c) => VarValue::Char(*c),
+            VarValue::Float(f) => VarValue::Float(*f),
+            VarValue::Double(d) => VarValue::Double(*d),
+            VarValue::DoubleHighBytes => VarValue::DoubleHighBytes,
+            VarValue::ReturnAddress(r) => VarValue::ReturnAddress(*r),
+            VarValue::Reference(r) => VarValue::Reference(r.clone()),
+            VarValue::Uninit => VarValue::Uninit,
+        }
     }
 }
 

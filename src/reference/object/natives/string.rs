@@ -8,11 +8,11 @@ pub struct String {
 }
 
 impl Object for String {
-    fn new(current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Self, Error> where Self: Sized {
-        Ok(String {s: std::string::String::from(""), 
-        s_class: jvm.resolve_class_reference("java/lang/String")?})
+    fn new(current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self: Sized {
+        Ok(Rc::new(String {s: std::string::String::from(""), 
+        s_class: jvm.resolve_class_reference("java/lang/String")?}))
     }
-    fn new_with_name(name: &str, jvm: &mut JVM) -> Result<Box<dyn Object>, Error> where Self: Sized {
+    fn new_with_name(name: &str, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self: Sized {
         panic!("No one should ever call String::new_with_name")
     }
     fn get_field(&self, current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {

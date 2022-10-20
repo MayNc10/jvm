@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Opcode {
     NOP,
     ACONSTNULL,
@@ -215,7 +215,7 @@ pub enum Opcode {
     NewObject,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Error {
     AbstractMethodCodeAccess,
     AbstractMethodError(Opcode),

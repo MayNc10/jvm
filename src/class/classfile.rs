@@ -185,61 +185,61 @@ pub struct ClassFile {
 
 impl ClassFile {
     pub fn access_flags(&self) -> flags::class::AccessFlags {
-        self.m_access_flags
+        self.access_flags
     }
     pub fn fields(&self) -> &Vec<FieldInfo> {
-        &self.m_fields
+        &self.fields
     }
     pub fn methods(&self) -> &Vec<MethodInfo> {
-        &self.m_methods
+        &self.methods
     }
     pub fn cp_entry(&self, index: u16) -> Result<&Entry, Error> {
         if index == 0 {
             return Err(Error::IllegalConstantPoolIndex);
         }
-        else if index > self.m_constant_pool.len() as u16 {
+        else if index > self.constant_pool.len() as u16 {
             return Err(Error::IllegalConstantPoolIndex);
         }
-        Ok(&self.m_constant_pool[(index - 1) as usize])
+        Ok(&self.constant_pool[(index - 1) as usize])
     }
     pub fn cp_entries(&self) -> &Vec<Entry> {
-        &self.m_constant_pool
+        &self.constant_pool
     }
     pub fn cpool_size(&self) -> usize {
-        self.m_constant_pool.len()
+        self.constant_pool.len()
     }
     pub fn interfaces(&self) -> &Vec<u16> {
-        &self.m_interfaces
+        &self.interfaces
     }
     pub fn minor_version(&self) -> u16 {
-        self.m_minor_version
+        self.minor_version
     }
     pub fn major_version(&self) -> u16 {
-        self.m_major_version
+        self.major_version
     }
     pub fn this_index(&self) -> u16 {
-        self.m_this_class_index
+        self.this_class_index
     }
     pub fn super_index(&self) -> Option<u16> {
-        match self.m_super_class_index {
+        match self.super_class_index {
             0 => None,
-            _ => Some(self.m_super_class_index)
+            _ => Some(self.super_class_index)
         }
     }
     pub fn name(&self) -> &str {
         // This code doesn't test the value of the option, and just uses unwrap, because cases like constant pool corruption should be tested in verify_state().
-        &((self.cp_entry(*self.cp_entry(self.m_this_class_index).unwrap().as_class().unwrap())).unwrap().as_utf8().unwrap())
+        &((self.cp_entry(*self.cp_entry(self.this_class_index).unwrap().as_class().unwrap())).unwrap().as_utf8().unwrap())
         
     }
     pub fn super_name(&self) -> Option<&str> {
         // This code doesn't test the value of the option, and just uses unwrap, because cases like constant pool corruption should be tested in verify_state()
-        if self.m_super_class_index != 0 {
-            return Some(&((self.cp_entry(*self.cp_entry(self.m_super_class_index).unwrap().as_class().unwrap())).unwrap().as_utf8().unwrap()));
+        if self.super_class_index != 0 {
+            return Some(&((self.cp_entry(*self.cp_entry(self.super_class_index).unwrap().as_class().unwrap())).unwrap().as_utf8().unwrap()));
         }
         None
     }
     #[inline] pub fn has_super(&self) -> bool {
-        self.m_super_class_index != 0
+        self.super_class_index != 0
     }
     pub fn is_interface(&self) -> bool {
         (self.access_flags().flags & flags::class::ACC_INTERFACE) > 0
@@ -881,8 +881,8 @@ impl ClassFile {
                     if let Some(_) = bootstrap_methods {
                         return Err(Error::IllegalDuplicateAttribute);
                     }
-                    let num_methods = read_u16(data_ptr, &mut location);
-                    let mut methods = Vec::with_capacity(num_methods as usize);
+                    let numethods = read_u16(data_ptr, &mut location);
+                    let mut methods = Vec::with_capacity(numethods as usize);
                     while methods.capacity() > methods.len() {
                         let method_ref = read_u16(data_ptr, &mut location);
                         let num_args = read_u16(data_ptr, &mut location);
@@ -1018,13 +1018,13 @@ impl ClassFile {
                     while record_components.capacity() > record_components.len() {
                         let record_name_index = read_u16(data_ptr, &mut location);
                         let descriptor_index = read_u16(data_ptr, &mut location);
-                        let num_record_attributes = read_u16(data_ptr, &mut location);
+                        let nurecord_attributes = read_u16(data_ptr, &mut location);
                         let mut record_signature = None;
                         let mut record_rt_vis_annotations = None;
                         let mut record_rt_invis_annotations = None;
                         let mut record_rt_vis_type_annotations = None;
                         let mut record_rt_invis_type_annotations = None;
-                        for _ in 0..num_record_attributes {
+                        for _ in 0..nurecord_attributes {
                             let name_index_record = read_u16(data_ptr, &mut location);
                             if name_index_record == 0 {
                                 return Err(Error::IllegalConstantPoolIndex);
@@ -1202,23 +1202,23 @@ use std::fmt;
 
 impl fmt::Display for  ClassFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Version: {}.{}\n", self.m_major_version, self.m_minor_version)?;
-        write!(f, "Size of Constant Pool: {}\n", self.m_constant_pool.len())?;
+        write!(f, "Version: {}.{}\n", self.major_version, self.minor_version)?;
+        write!(f, "Size of Constant Pool: {}\n", self.constant_pool.len())?;
         write!(f, "Constant Pool:\n")?;
-        for entry in &self.m_constant_pool {
+        for entry in &self.constant_pool {
             write!(f, "{}\n", entry)?;
         }
-        write!(f, "Access flags: {}\n", self.m_access_flags)?;
-        write!(f, "This class index: {}\n", self.m_this_class_index)?;
+        write!(f, "Access flags: {}\n", self.access_flags)?;
+        write!(f, "This class index: {}\n", self.this_class_index)?;
         write!(f, "This class entry:\n")?;
-        let this_index = self.cp_entry(self.m_this_class_index).unwrap();
+        let this_index = self.cp_entry(self.this_class_index).unwrap();
         write!(f, "{}\n", this_index)?;
         write!(f, "This class name:\n")?;
         write!(f, "{}\n", self.cp_entry(*this_index.as_class().unwrap()).unwrap())?;
         if self.has_super() {
-            write!(f, "Super class index: {}\n", self.m_super_class_index)?;
+            write!(f, "Super class index: {}\n", self.super_class_index)?;
             write!(f, "Super class entry:\n")?;
-            let super_index = self.cp_entry(self.m_super_class_index).unwrap();
+            let super_index = self.cp_entry(self.super_class_index).unwrap();
             write!(f, "{}\n", super_index)?;
             write!(f, "Super class name:\n")?;
             write!(f, "{}\n", self.cp_entry(*super_index.as_class().unwrap()).unwrap())?;
@@ -1226,31 +1226,31 @@ impl fmt::Display for  ClassFile {
         else {
             write!(f, "This class has no super class\n")?;
         }
-        write!(f, "Number of interfaces: {}\n", self.m_interfaces.len())?;
+        write!(f, "Number of interfaces: {}\n", self.interfaces.len())?;
         write!(f, "Interfaces:\n")?;
-        for interface in &self.m_interfaces {
+        for interface in &self.interfaces {
             write!(f, "Interface index: {}\n", interface)?;
             write!(f, "Interface: \n")?;
             write!(f, "{}\n", self.cp_entry(*interface).unwrap())?;
         }
-        write!(f, "Number of fields: {}\n", self.m_fields.len())?;
+        write!(f, "Number of fields: {}\n", self.fields.len())?;
         write!(f, "Fields:\n")?;
-        for field in &self.m_fields {
+        for field in &self.fields {
             write!(f, "{:#?}\n", field)?;
         }
-        write!(f, "Number of methods: {}\n", self.m_methods.len())?;
+        write!(f, "Number of methods: {}\n", self.methods.len())?;
         write!(f, "Methods:\n")?;
-        for method in &self.m_methods {
+        for method in &self.methods {
             write!(f, "{:#?}\n", method)?;
         }
-        if let Some(file) = self.m_source_file {
+        if let Some(file) = self.source_file {
             write!(f, "Source file index: {}\n", file)?;
             write!(f, "Source file: {}\n", self.cp_entry(file).unwrap())?;
         }
         else {
             write!(f, "This class has no SourceFile attribute\n")?;
         }
-        if let Some(classes) = &self.m_inner_classes {
+        if let Some(classes) = &self.inner_classes {
             write!(f, "Number of inner classes: {}\n", classes.len())?;
             write!(f, "Inner classes:\n")?;
             for class in classes {
@@ -1260,19 +1260,19 @@ impl fmt::Display for  ClassFile {
         else {
             write!(f, "This class has no InnerClasses attribute\n")?;
         }
-        if let Some(method) = &self.m_enclosing_method {
+        if let Some(method) = &self.enclosing_method {
             write!(f, "Enclosing method: {:#?}\n", method)?;
         }
         else {
             write!(f, "This class has no EnclosingMethod attribute\n")?;
         }
-        if let Some(extension) = &self.m_source_debug_extension {
+        if let Some(extension) = &self.source_debug_extension {
             write!(f, "Source debug extension: {:#?}\n", extension);
         }
         else {
             write!(f, "This class has no SourceDebugExtension attribute\n")?;
         }
-        if let Some(bootstraps) = &self.m_bootstrap_methods {
+        if let Some(bootstraps) = &self.bootstrap_methods {
             write!(f, "Number of bootstrap methods; {}\n", bootstraps.len())?;
             write!(f, "Bootstrap methods:\n")?;
             for method in bootstraps {
@@ -1282,13 +1282,13 @@ impl fmt::Display for  ClassFile {
         else {
             write!(f, "This class has no BootstrapMethods attribute\n")?;
         }
-        if let Some(module) = &self.m_module {
+        if let Some(module) = &self.module {
             write!(f, "Module: {:#?}\n", module);
         }
         else {
             write!(f, "This class has no Module attribute\n")?;
         }
-        if let Some(packages) = &self.m_module_packages {
+        if let Some(packages) = &self.module_packages {
             write!(f, "Number of module packages: {}\n", packages.len())?;
             write!(f, "Module packages:\n")?;
             for package_index in packages {
@@ -1298,20 +1298,20 @@ impl fmt::Display for  ClassFile {
         else {
             write!(f, "This class has no ModulePackages attribute\n")?;
         }
-        if let Some(main_class) = self.m_module_main_class {
+        if let Some(main_class) = self.module_main_class {
             write!(f, "Module main class index: {}\n", main_class)?;
             write!(f, "Module main class: {}\n", self.cp_entry(main_class).unwrap())?;
         }
         else {
             write!(f, "This class has no ModuleMainClass attribute\n")?;
         }
-        if let Some(host) = self.m_nest_host {
+        if let Some(host) = self.nest_host {
             write!(f, "Host class: {}", self.cp_entry(host).unwrap())?;
         }
         else {
             write!(f, "This class has no NestHost attribute\n")?;
         }
-        if let Some(members) = &self.m_nest_members {
+        if let Some(members) = &self.nest_members {
             write!(f, "Number of nest members: {}\n", members.len())?;
             write!(f, "Nest members:\n");
             for member in members {
@@ -1321,7 +1321,7 @@ impl fmt::Display for  ClassFile {
         else {
             write!(f, "This class has no NestMembers attribute\n")?;
         }
-        if let Some(record) = &self.m_record {
+        if let Some(record) = &self.record {
             writeln!(f, "Number of record components: {}", record.len())?;
             writeln!(f, "Record components:")?;
             for component in record {
@@ -1331,7 +1331,7 @@ impl fmt::Display for  ClassFile {
         else {
             write!(f, "This class has no Record attribute\n")?;
         }
-        if let Some(subclasses) = &self.m_permitted_subclasses {
+        if let Some(subclasses) = &self.permitted_subclasses {
             writeln!(f, "Number of permitted subclasses: {}", subclasses.len())?;
             writeln!(f, "Permitted subclasses:")?;
             for class in subclasses {
@@ -1341,19 +1341,19 @@ impl fmt::Display for  ClassFile {
         else {
             write!(f, "This class has no PermittedSubclasses attribute\n")?;
         }
-        if self.m_synthetic {
+        if self.synthetic {
             writeln!(f, "This class is synthetic")?;
         }
-        if self.m_deprecated {
+        if self.deprecated {
             writeln!(f, "WARNING: This class is deprecated, and should not be used")?;
         }
-        if let Some(signature) = self.m_signature {
+        if let Some(signature) = self.signature {
             write!(f, "Class signature: {}", self.cp_entry(signature).unwrap())?;
         }
         else {
             write!(f, "This class has no Signature attribute\n")?;
         }
-        if let Some(annotations) = &self.m_rt_vis_annotations {
+        if let Some(annotations) = &self.rt_vis_annotations {
             writeln!(f, "Number of visible annotations: {}", annotations.len())?;
             writeln!(f, "Visible annotations:")?;
             for annotation in annotations {
@@ -1363,7 +1363,7 @@ impl fmt::Display for  ClassFile {
         else {
             write!(f, "This class has no RuntimeVisibleAnnotations attribute\n")?;
         } 
-        if let Some(annotations) = &self.m_rt_invis_annotations {
+        if let Some(annotations) = &self.rt_invis_annotations {
             writeln!(f, "Number of invisible annotations: {}", annotations.len())?;
             writeln!(f, "Invisible annotations:")?;
             for annotation in annotations {
@@ -1373,7 +1373,7 @@ impl fmt::Display for  ClassFile {
         else {
             write!(f, "This class has no RuntimeInvisibleAnnotations attribute\n")?;
         } 
-        if let Some(annotations) = &self.m_rt_vis_type_annotations {
+        if let Some(annotations) = &self.rt_vis_type_annotations {
             writeln!(f, "Number of visible type annotations: {}", annotations.len())?;
             writeln!(f, "Visible type annotations:")?;
             for annotation in annotations {
@@ -1383,7 +1383,7 @@ impl fmt::Display for  ClassFile {
         else {
             write!(f, "This class has no RuntimeVisibleAnnotations attribute\n")?;
         } 
-        if let Some(annotations) = &self.m_rt_invis_type_annotations {
+        if let Some(annotations) = &self.rt_invis_type_annotations {
             writeln!(f, "Number of invisible type annotations: {}", annotations.len())?;
             writeln!(f, "Invisible type annotations:")?;
             for annotation in annotations {

@@ -37,7 +37,7 @@ impl<'a> Class for CustomClass {
                             Entry::Double(d) => Value::Double(d),
                             Entry::String(s_index) => {
                                 // This should make a new instance of String, but for now we will just give a null ref.
-                                Value::Reference(Rc::new(Reference::Null))
+                                Value::Reference(Reference::Null)
                             },
                             _ => return Err(Error::IllegalConstantLoad(Opcode::ClassLoad)),
                         }
@@ -52,7 +52,7 @@ impl<'a> Class for CustomClass {
                             "J" => Value::Long(0),
                             "D" => Value::Double(0.0),
                             "[" | "L" => {
-                                Value::Reference(Rc::new(Reference::Null))
+                                Value::Reference(Reference::Null)
                             },
                             _ => return Err(Error::IllegalDescriptor),
                         }
@@ -63,59 +63,92 @@ impl<'a> Class for CustomClass {
         }
         Ok(CustomClass { class_file: Rc::new(file), static_fields })
     }
-    fn get_static(&self, name: &String, descriptor: &String, jvm: &mut JVM) -> Result<Rc<Value<dyn Class, dyn Object>>, Error> {
+    fn get_static(&self, name: &String, descriptor: &String, jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {
         let name_and_type = NameAndType { name: String::from(name), descriptor: String::from(descriptor) };
+        if let Some(v) = self.static_fields.get(&name_and_type) {
+            Ok((**v).clone())
+        }
+        else {
+            for interface_index in &self.class_file.interfaces {
+                let interface_name_index = self.class_file.cp_entry(*interface_index)?.as_class()?;
+                let interface_name = self.class_file.cp_entry(*interface_name_index)?.as_utf8()?;
+                let mut interface;
+                let mut current_interface = &jvm.resolve_class_reference(interface_name)?;
+                // Now we loop over the superclasses of the interface.
+                while current_interface.get_class_file().has_super() {
+                    if let Ok(v) = current_interface.get_static(name, descriptor, jvm) {
+                        return Ok(v);
+                    }
+                    interface = jvm.resolve_class_reference(current_interface.get_class_file().super_name().unwrap())?;
+                    current_interface = &interface;
+                }
+            }
+            if self.class_file.has_super() {
+                jvm.resolve_class_reference(self.class_file.super_name().unwrap())?.get_static(name, descriptor, jvm)
+            }
+            else {
+                Err(Error::NoSuchFieldError(Opcode::GETSTATIC))
+            }
+        }
+        /* 
         let mut class;
         let mut current_class = &jvm.resolve_class_reference(self.class_file.name())?;
-        while current_class.has_super() {
+        while current_class.get_class_file().has_super() {
             // First, check the current class's fields.
-            if let Some(v) = current_class.m_static_fields.get(&name_and_type) {
+            if let Some(v) = current_class.get_class_file().static_fields.get(&name_and_type) {
                 return Ok(v.clone());
             }
             // Next, we have to check the interfaces
 
-            for interface_index in &current_class.m_interfaces {
-                let interface_name_index = current_class.cp_entry(*interface_index)?.as_class()?;
-                let interface_name = current_class.cp_entry(*interface_name_index)?.as_utf8()?;
+            for interface_index in &current_class.get_class_file().interfaces {
+                let interface_name_index = current_class.get_class_file().cp_entry(*interface_index)?.as_class()?;
+                let interface_name = current_class.get_class_file().cp_entry(*interface_name_index)?.as_utf8()?;
                 let mut interface;
                 let mut current_interface = &jvm.resolve_class_reference(interface_name)?;
                 // Now we loop over the superclasses of the interface.
-                while current_interface.has_super() {
-                    if let Some(v) = current_interface.m_static_fields.get(&name_and_type) {
+                while current_interface.get_class_file().has_super() {
+                    if let Some(v) = current_interface.get_class_file().m_static_fields.get(&name_and_type) {
                         return Ok(v.clone());
                     }
-                    interface = jvm.resolve_class_reference(current_interface.super_name().unwrap())?;
+                    interface = jvm.resolve_class_reference(current_interface.get_class_file().super_name().unwrap())?;
                     current_interface = &interface;
                 }
             }
             // Finally, we propogate to the superclasses of the current class.
-            class = jvm.resolve_class_reference(current_class.super_name().unwrap())?;
+            class = jvm.resolve_class_reference(current_class.get_class_file().super_name().unwrap())?;
             current_class = &class;
         }
-        Err(Error::NoSuchFieldError(Opcode::GETSTATIC))
+        
+        */
     }
+    //https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-6.html#jvms-6.5.putstatic
     fn put_static(&mut self, name: &String, descriptor: &String, value: Value<dyn Class, dyn Object>, jvm: &mut JVM) -> Result<(), Error> {
         let name_and_type = NameAndType { name: String::from(name), descriptor: String::from(descriptor) };
-        let mut current_class = jvm.resolve_class_reference(self.class_file.name())?;
-        while current_class.has_super() {
-            // First, check the current class's fields.
-            if let Some(v) = unsafe { Rc::get_mut_unchecked(&mut current_class).m_static_fields.get_mut(&name_and_type) } {
-                unsafe {*Rc::get_mut_unchecked(v) = value; }
-                return Ok(());
+        if let Some(v) = self.static_fields.get_mut(&name_and_type) {
+            // FIXME: Check compatibility
+            unsafe {
+                *Rc::get_mut_unchecked(v) = value;
             }
-            // We actually don't need to check the interfaces, because interface variables are final and cannot be modified.
-            // That just means we need to get the next super class.
-            current_class = jvm.resolve_class_reference(current_class.super_name().unwrap())?;
+            Ok(())
         }
-        Err(Error::NoSuchFieldError(Opcode::PUTSTATIC))
+        else if !self.class_file.has_super() {
+            Err(Error::NoSuchFieldError(Opcode::PUTSTATIC))
+        }
+        else {
+            jvm.resolve_class_reference(self.class_file.super_name().unwrap())?.put_static(name, descriptor, value, jvm)
+        }
+        
     }
     fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
-        
+        Err(Error::Todo(Opcode::MethodInvoke))
     }
     fn get_class_file(&self) -> Rc<ClassFile> {
         self.class_file.clone()
     }
     fn as_dyn_rc(self: Rc<Self>) -> Rc<dyn Class> {
+        self
+    }
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any> {
         self
     }
 }

@@ -30,4 +30,14 @@ pub trait Object {
         &self
     }
     fn into_any_rc(self: Rc<Self>) -> Rc<dyn Object>;
+    fn is_equal(&self, other: &dyn Object) -> bool;
+}
+
+impl PartialEq for dyn Object {
+    fn eq(&self, other: &Self) -> bool {
+        self.is_equal(other)
+    }
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
 }

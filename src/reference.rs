@@ -101,15 +101,12 @@ impl<C: Class + ?Sized, O: Object + ?Sized>  Reference<C, O> {
             _ => Err(Error::IllegalReferenceCastToArray),
         }
     }
-
     pub fn to_interface<CC: Class>(reference: Reference<C, O>, c: Rc<CC>) -> Result<Reference<CC, O>, Error> {
         match reference {
             Reference::Null => Ok(Reference::new_interface(c)),
             _ => Err(Error::IllegalReferenceCastToInterface),
         }
     }
-
-
     pub fn to_object(reference: Reference<dyn Class, dyn Object>, current_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Reference<dyn Class, dyn Object>, Error> {
         match reference {
             Reference::Null => Ok(Reference::<dyn Class, dyn Object>::new_object(current_class, class_index, jvm)?),
@@ -117,5 +114,58 @@ impl<C: Class + ?Sized, O: Object + ?Sized>  Reference<C, O> {
         }
     }
 
+    pub fn ptr_eq(this: &Reference<dyn Class, dyn Object>, other: &Reference<dyn Class, dyn Object>) -> bool {
+        match this {
+            Reference::Null => match other {
+                Reference::Null => true,
+                _ => false,
+            },
+            Reference::Array(a, m) => match other {
+                Reference::Array(a1, m1) => 
+                    Rc::ptr_eq(a, a1) && Rc::ptr_eq(m, m1),
+                _ => false,
+            },
+            Reference::Interface(i, m) => match other {
+                Reference::Interface(i1, m1) => 
+                    Rc::ptr_eq(i, i1) && Rc::ptr_eq(m, m1),
+                _ => false,
+            },
+            Reference::Object(o, m) => match other {
+                Reference::Object(o1, m1) => 
+                Rc::ptr_eq(o, o1) && Rc::ptr_eq(m, m1),
+                _ => false,
+            },
+        }
+    }
     
 }
+
+impl PartialEq for Reference<dyn Class, dyn Object> {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Reference::Null => match other {
+                Reference::Null => true,
+                _ => false,
+            },
+            Reference::Array(a, m) => match other {
+                Reference::Array(a1, m1) => 
+                    a == a1 && Rc::ptr_eq(m, m1),
+                _ => false,
+            },
+            Reference::Interface(i, m) => match other {
+                Reference::Interface(i1, m1) => 
+                    Rc::ptr_eq(i, i1) && Rc::ptr_eq(m, m1),
+                _ => false,
+            },
+            Reference::Object(o, m) => match other {
+                Reference::Object(o1, m1) => 
+                    o == o1 && Rc::ptr_eq(m, m1),
+                _ => false,
+            },
+        }
+    }
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
+}
+

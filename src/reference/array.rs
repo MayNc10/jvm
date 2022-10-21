@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::marker::PhantomData;
 use std::result::Result;
 use std::rc::Rc;
@@ -18,6 +19,15 @@ pub struct RefArray<C: Class + ?Sized, O: Object + ?Sized> {
     pub arr: Vec<Reference<C, O>>,
     // This descriptor could be massively improved by making it a recursive enum. For now, this works.
     pub descriptor: String, 
+}
+
+impl PartialEq for RefArray<dyn Class, dyn Object> {
+    fn eq(&self, other: &Self) -> bool {
+        self.arr == other.arr && self.descriptor == self.descriptor
+    }
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -360,6 +370,52 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Array<C, O> {
             Array::Short(_) => "[S",
             Array::Ref(r) => r.descriptor.as_str(),
         }
+    }
+}
+
+macro_rules! partial_eq_array {
+    ($T:ty, $name:ident) => {
+        impl PartialEq<$T> for Array<dyn Class, dyn Object> {
+            fn eq(&self, other: &$T) -> bool {
+                match self {
+                    Array::$name(v) => v == other,
+                    _ => false,
+                }
+            }
+            fn ne(&self, other: &$T) -> bool {
+                !self.eq(other)
+            }
+        }
+    };
+}
+
+partial_eq_array!(Vec<bool>, Bool);
+partial_eq_array!(Vec<u16>, Char);
+partial_eq_array!(Vec<f64>, Double);
+partial_eq_array!(Vec<f32>, Float);
+partial_eq_array!(Vec<i64>, Long);
+partial_eq_array!(Vec<i8>, Byte);
+partial_eq_array!(Vec<i16>, Short);
+partial_eq_array!(Vec<i32>, Int);
+partial_eq_array!(RefArray<dyn Class, dyn Object>, Ref);
+
+
+impl PartialEq for Array<dyn Class, dyn Object> {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Array::Bool(v) => other == v,
+            Array::Char(v)=> other == v,
+            Array::Double(v)=> other == v,
+            Array::Float(v)=> other == v,
+            Array::Long(v)=> other == v,
+            Array::Byte(v) => other == v,
+            Array::Short(v)=> other == v,
+            Array::Int(v)=> other == v,
+            Array::Ref(v)=> other == v,
+        }
+    }
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
     }
 }
 

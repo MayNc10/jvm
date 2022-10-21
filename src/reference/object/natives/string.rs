@@ -57,5 +57,11 @@ impl Object for String {
     fn into_any_rc(self: Rc<Self>) -> Rc<dyn Object> {
         self
     }
+    fn is_equal(&self, other: &dyn Object) -> bool {
+        match other.as_any().downcast_ref::<String>() {
+            None => false,
+            Some(other) => self.s == other.s,
+        }
+    }
 
 }

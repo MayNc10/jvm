@@ -29,6 +29,47 @@ pub enum Value<C: Class + ?Sized, O: Object + ?Sized> {
     Reference(reference::Reference<C, O>)
 }
 
+impl PartialEq for Value<dyn Class, dyn Object> {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Value::Byte(b) => {
+                other.is_int() && b == other.as_int().unwrap()
+            },
+            Value::Short(s) => {
+                other.is_int() && s == other.as_int().unwrap()
+            },
+            Value::Int(i) => {
+                other.is_int() && i == other.as_int().unwrap()
+            },
+            Value::Long(l) => {
+                other.is_long() && l == other.as_long().unwrap()
+            },
+            Value::Char(c) => {
+                other.is_int() && c == other.as_int().unwrap()
+            },
+            Value::Float(f) => {
+                other.is_float() && f == other.as_float().unwrap()
+            },
+            Value::Double(d) => {
+                other.is_double() && d == other.as_double().unwrap()
+            },
+            Value::ReturnAddress(r) => {
+                other.is_retaddr() && r == other.as_retaddr().unwrap()
+            },
+            Value::Reference(r) => {
+                other.is_reference() && r == &other.as_reference().unwrap()
+            },
+        }
+    }
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
+}
+
+impl<C: Class + ?Sized, O: Object + ?Sized> Value<C,O>  {
+    
+}
+
 impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Display for Value<C, O> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

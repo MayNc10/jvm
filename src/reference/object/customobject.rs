@@ -161,4 +161,10 @@ impl<C: Class + ?Sized> Object for CustomObject<C> {
     fn into_any_rc(self: Rc<Self>) -> Rc<dyn Object> {
         self
     }
+    fn is_equal(&self, other: &dyn Object) -> bool {
+        match other.as_any().downcast_ref::<CustomObject<C>>() {
+            None => false,
+            Some(other) => self.instance_vars == other.instance_vars && Rc::ptr_eq(&self.class, &other.class) ,
+        }
+    }
 }

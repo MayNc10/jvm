@@ -26,11 +26,15 @@ pub trait Object {
     fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error>; // Figure out what else to pass
     // Give back the class file that backs this object.
     fn class(&self) -> Rc<dyn Class>;
-    fn as_any(&self) -> &dyn Any {
-        &self
-    }
+    fn as_any(&self) -> &dyn Any;
     fn into_any_rc(self: Rc<Self>) -> Rc<dyn Object>;
     fn is_equal(&self, other: &dyn Object) -> bool;
+}
+
+pub fn new_object(name: &str, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> {
+    match name {
+        _ => customobject::CustomObject::<dyn Class>::new_with_name(name, jvm)
+    }
 }
 
 impl PartialEq for dyn Object {

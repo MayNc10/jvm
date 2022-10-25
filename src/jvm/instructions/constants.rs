@@ -1,3 +1,5 @@
+use crate::reference::object::natives;
+
 use super::*;
 
 pub struct Nop {}
@@ -32,7 +34,7 @@ impl Instruction for AConstNull {
     fn execute(&mut self, jvm : &mut super::JVM) -> Result<(), crate::errorcodes::Error> {
         let thread = access_macros::current_thread_mut!(jvm);  
         let frame = access_macros::current_frame_mut!(thread);
-        frame.op_stack.push(Value::Reference(Rc::new(Reference::Null)));
+        frame.op_stack.push(Value::Reference(Reference::Null));
         Ok(())
     }
 }
@@ -390,38 +392,22 @@ pub mod ldc {
         }
     }
     pub struct LDCString {
-        s: &'static str // This should hopefully work, if not idk. 
+        s: Reference<dyn Class, dyn Object>, 
     }
     impl LDCFunc for LDCString {
         fn execute(&mut self, jvm : &mut JVM) -> Result<(), Error> {
-            let s_obj = Object::new_with_name("java/lang/String", jvm)?;
-            let string_class = Rc::clone(&s_obj.m_class);
-            let s_ref = Reference::Object(s_obj.clone(), Rc::new(Monitor::new()));             
-            let carray = Array::Char(self.s.encode_utf16().collect());
-            let carray_len = carray.len();
-            let carray_asref = Reference::Array(carray, Rc::new(Monitor::new()));
-            let mut s_ref_rc = Rc::new(s_ref);
-            let thread = access_macros::current_thread_mut!(jvm);
-            let frame = access_macros::current_frame_mut!(thread);
-            frame.op_stack.push(Value::Reference(Rc::clone(&mut s_ref_rc)));
-            frame.op_stack.push(Value::Reference(s_ref_rc)); // duplicate the value, so we still have one afterwards.
-            frame.op_stack.push(Value::Reference(Rc::new(carray_asref)));
-            frame.op_stack.push(Value::Int(0));
-            frame.op_stack.push(Value::Int(carray_len as i32));
-            jvm.setup_method_call_from_name("<init>", "([CII)V", Rc::clone(&string_class) , false)?;
-            jvm.run_until_method_exit();
-            // Lastly, we have to call .intern() on it.
-            // String <init> calls this already, so I don't think we have to call it.
-            // jv,.execute_native_from_name("intern", "()Ljava/lang/String;", string_class)?;
+            let thread = current_thread_mut!(jvm);
+            let frame = current_frame_mut!(thread);
+            frame.op_stack.push(Value::Reference(self.s.clone()));
             Ok(())
         }
     }
     pub struct LDCClass {
-        c_name: &'static str, // same idea as LDCString
+        c_name: String,
     }
     impl LDCFunc for LDCClass {
         fn execute(&mut self, jvm : &mut JVM) -> Result<(), Error> {
-            jvm.gen_class_obj(self.c_name)
+            jvm.gen_class_obj(self.c_name.as_str())
         }
     }
     pub struct LDCMethodType {
@@ -447,19 +433,79 @@ pub mod ldc {
 
 }
 
-pub struct LDC<F: ldc::LDCFunc> {
+pub struct LDC<F: ldc::LDCFunc + ?Sized> {
     f: Box<F> // Has to be a ptr for size reasons. This still should be performant. 
 }
-impl<F: ldc::LDCFunc> Instruction for LDC<F> {
+impl Instruction for LDC<dyn ldc::LDCFunc> {
     fn name(&self) -> &'static str {
         "ldc"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, c: Rc<dyn Class>, jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         }
         else {
-
+            // First, get the constant pool entry at that index.
+            let entry = c.get_class_file().cp_entry(unsafe {
+                u16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())  
+            })?;
+            let f = match entry {
+                Entry::Integer(i) => Box::new(ldc::LDCInt {i: *i}) as Box<dyn ldc::LDCFunc>,
+                Entry::Float(f) => Box::new(ldc::LDCFloat {f: *f}) as Box<dyn ldc::LDCFunc>,
+                Entry::String(s) => Box::new(ldc::LDCString {
+                        s: Reference::Object(
+                           natives::string::String::new_from_string(c.get_class_file().cp_entry(*s)?.as_utf8()?.clone(), jvm)?, 
+                        Rc::new(Monitor::new())) 
+                }),
+                Entry::Class(c) => {
+                    // The spec says we have to return a reference to the class or interface itself. 
+                    // I think it means that we have to create a java.lang.Class object and return a reference.
+                    // For the same reasons as string above, we are not implementing this right now.
+                    return Err(Error::Todo(Opcode::LDC));
+                },
+                // For these next 2, see https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.5
+                Entry::MethodType(m) => {
+                    // This one is a reference to java.lang.invoke.MethodType.
+                    // See above.
+                    return Err(Error::Todo(Opcode::LDC));
+                },
+                Entry::MethodHandle(m) => {
+                    // This one is incredibly complicated, but should result in a java.lang.invoke.MethodHandle.
+                    return Err(Error::Todo(Opcode::LDC));
+                },
+                Entry::Dynamic(dynamic) => {
+                    // This Dynamic cannot reference a field with discriptor Long or Double.
+    
+                    // For more information about the process see: https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.6
+                    // First, we have to find a 'bootstrap method' to call to produce the value.
+                    // This is done by indexing into the BootstrapMethods Attribute of the current class.
+                    // This gives us a methodhandle info and a list of static arguments (loadable entries in the constant pool).
+                    // The method handle is resolved in the same way as above, except that the first parameter of the method must be java.lang.invoke.MethodHandles.Lookup.
+                    // If it's not, we fail with a BootstrapMethodError.
+                    // We alse get a field descriptor, from which we create a java.lang.Class object from it.
+                    // We then resolve every static argument. This process can be recursive, so we should make it a function.
+                    // Second, we have to call the bootstrap method.
+                    // To do this, we first create an Array of Object with length n + 3, where n is the number of static arguments.
+                    // The 0[] index is a reference an instance of java.lang.invoke.MethodHandles.Lookup for the current class.
+                    // The 1[] index is an reference to an instance of java.lang.String denoting the unqualified name from the name and type info.
+                    // The 2[] index is the reference to and instance of Class obtained earlier.
+                    // The rest of the array is filled with the static arguments.
+                    // The method handle is invoked with BMH.invokeWithArguments(args).
+                    // Finally, we have to validate the reference produced by the invocation.
+                    // the reference o is converted as if by invoking MH.invoke(o), 
+                    // where MH is a method handler produced from invoking the identity(class Object) method of java.lang.invoke.MethodHandles.
+                    // If this gives a NullPtrException or a ClassCastExeption, we fail with a BootstrapMethodError.
+                    return Err(Error::Todo(Opcode::LDC));
+                },
+                Entry::Long(_) | Entry::Double(_) => {
+                    // Even though these are loadable, they shouldn't appear here
+                    return Err(Error::IllegalConstantLoad(Opcode::LDCW));
+                },
+                _ => {
+                    return Err(Error::IllegalConstantLoad(Opcode::LDCW));
+                },
+            };
+            Ok(LDC { f })
         }
     }
     fn execute(&mut self, jvm : &mut JVM) -> Result<(), Error> {

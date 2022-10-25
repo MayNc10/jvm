@@ -61,6 +61,9 @@ impl Object for Integer {
     fn class(&self) -> Rc<dyn Class> {
         self.int_class.clone()
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
     fn into_any_rc(self: Rc<Self>) -> Rc<dyn Object> {
         self
     }

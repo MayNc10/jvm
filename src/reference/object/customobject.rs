@@ -158,6 +158,9 @@ impl<C: Class + ?Sized> Object for CustomObject<C> {
     fn class(&self) -> Rc<dyn Class> {
        Rc::clone(&self.class).as_dyn_rc() 
     }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
     fn into_any_rc(self: Rc<Self>) -> Rc<dyn Object> {
         self
     }

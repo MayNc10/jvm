@@ -1,5 +1,5 @@
 use crate::reference::array::Array;
-use crate::access_macros;
+use crate::{access_macros, class};
 use crate::attributes::code::Exception;
 use crate::errorcodes::{Error, Opcode};
 use crate::class::{Class, classfile::MethodInfo};
@@ -80,8 +80,8 @@ impl JVM {
         }
     }
     pub fn new_with_main_class<C: Class>(c: C, flags: u8) -> Result<JVM, Error> {
-        let mut jvm = Self::new_jvm(String::from(c.name()), flags);
-        let name = String::from(c.name());
+        let mut jvm = Self::new_jvm(String::from(c.get_class_file().name()), flags);
+        let name = String::from(c.get_class_file().name());
         jvm.m_loaded_classes.insert(name, Rc::new(c));
         // After adding the class, we initialize the class
         // We should use this error instead of ignoring it.
@@ -124,11 +124,10 @@ impl JVM {
         let c = unsafe {
             let mut buf_bytes = std::slice::from_raw_parts_mut(buffer.as_ptr() as *mut u8, buffer.len() * std::mem::size_of::<u64>());
             f.read(&mut buf_bytes).unwrap();
-            Class::new(&buf_bytes)?
+            class::new_class(self, class::classfile::ClassFile::new(&buf_bytes)?)?
         };
-        let c_rc = Rc::new(c);
         // Adding the class to the map here seems a bit weird, but if we don't we overflow the stack.
-        self.m_loaded_classes.insert(String::from(c_rc.name()), Rc::clone(&c_rc)); 
+        self.m_loaded_classes.insert(String::from(c.get_class_file().name()), Rc::clone(&c)); 
         // clinit if a class has it.
         let mut found_clinit = true;
         if let Err(e) = self.setup_method_call_from_name_on_main("<clinit>", "()V", true) {
@@ -144,7 +143,7 @@ impl JVM {
         if &path[0..4] == "java" {
             if path == "java/lang/System" {
                 // After loading the system class, we have to call initPhase1() on it
-                self.setup_method_call_from_name("initPhase1", "()V", c_rc , true)?;
+                self.setup_method_call_from_name("initPhase1", "()V", c , true)?;
                 self.run_until_method_exit();
             }
         }
@@ -242,8 +241,8 @@ impl JVM {
                     for frame in access_macros::current_thread_mut!(self).m_stack.iter().rev() {
                         let current_class = &frame.rt_const_pool;
                         // TODO: Fix these unwrap calls.
-                        println!("Method name: {}, Method descriptor: {}, Method class: {}", current_class.cp_entry(frame.current_method.name_index).unwrap().as_utf8().unwrap(),
-                        current_class.cp_entry(frame.current_method.descriptor_index).unwrap().as_utf8().unwrap(), current_class.name());
+                        println!("Method name: {}, Method descriptor: {}, Method class: {}", current_class.get_class_file().cp_entry(frame.current_method.name_index).unwrap().as_utf8().unwrap(),
+                        current_class.get_class_file().cp_entry(frame.current_method.descriptor_index).unwrap().as_utf8().unwrap(), current_class.get_class_file().name());
                         println!("Local variables:");
                         for local in frame.local_variables.iter().rev() {
                             println!("  {:#?}", local);
@@ -559,13 +558,13 @@ impl JVM {
                         // First, resolve class and object.
                         let object = self.resolve_class_reference(object_desc)?;
                         let class = self.resolve_class_reference(class_desc)?;
-                        match class.is_interface() {
+                        match class.get_class_file().is_interface() {
                             true => {
                                 // If class is an interface, then object must implement class.
                                 // We should add a short-circuit in the case that object also refers to an interface, because interfaces can't have interfaces,
-                                for interface_index in object.interfaces() {
-                                    let class_index = class.cp_entry(*interface_index)?.as_class()?;
-                                    let ob_class_desc = class.cp_entry(*class_index)?.as_utf8()?;
+                                for interface_index in object.get_class_file().interfaces() {
+                                    let class_index = class.get_class_file().cp_entry(*interface_index)?.as_class()?;
+                                    let ob_class_desc = class.get_class_file().cp_entry(*class_index)?.as_utf8()?;
                                     if ob_class_desc == class_desc {
                                         return Ok(true);
                                     }
@@ -575,12 +574,12 @@ impl JVM {
                             false => {
                                 // If class is a class, then object must be a subclass.
                                 let mut current_class = object;
-                                while current_class.has_super() {
-                                    if current_class == class {
+                                while current_class.get_class_file().has_super() {
+                                    if Rc::ptr_eq(&current_class, &class) {
                                         return Ok(true);
                                     }
-                                    let super_name_index = current_class.cp_entry(current_class.super_index().unwrap())?.as_class()?;
-                                    let super_name = current_class.cp_entry(*super_name_index)?.as_utf8()?;
+                                    let super_name_index = current_class.get_class_file().cp_entry(current_class.get_class_file().super_index().unwrap())?.as_class()?;
+                                    let super_name = current_class.get_class_file().cp_entry(*super_name_index)?.as_utf8()?;
                                     current_class = self.resolve_class_reference(super_name.as_str())?;
                                 }
                                 Ok(false)
@@ -595,7 +594,7 @@ impl JVM {
                 match class_desc.as_bytes()[0] as char {
                     'L' => {
                         let class = self.resolve_class_reference(class_desc)?;
-                        match class.is_interface() {
+                        match class.get_class_file().is_interface() {
                             true => {
                                 // If class is an interface, it has to be an interface implemented by arrays. 
                                 // i don't know what those are, so for now, we just return false.
@@ -646,9 +645,9 @@ impl JVM {
                     return Err(Error::StackUnderflow(Opcode::ExceptionHandle));
                 }
                 let exception_rc = frame.op_stack[len - 1].as_reference().unwrap().clone(); // We should check the soundness of this cast before calling.
-                let exception: &Object = match &*exception_rc { // This should also be ensured by the caller.
+                let exception = match exception_rc { // This should also be ensured by the caller.
                     Reference::Array(_, _) | Reference::Interface(_, _) | Reference::Null => return Err(Error::IncorrectReferenceType(Opcode::ExceptionHandle)),
-                    Reference::Object(o, _) => &o,
+                    Reference::Object(o, _) => o,
                 };
                 let code = match frame.current_method.code.clone() {
                     Some(c) => c,
@@ -665,19 +664,19 @@ impl JVM {
                                 true // This catches all exceptions
                             }
                             else {                           
-                                let catch_class_name_index = *current_class.cp_entry(ex_handler.catch_type)?.as_class()?;
-                                let catch_class_name = current_class.cp_entry(catch_class_name_index)?.as_utf8()?;
+                                let catch_class_name_index = *current_class.get_class_file().cp_entry(ex_handler.catch_type)?.as_class()?;
+                                let catch_class_name = current_class.get_class_file().cp_entry(catch_class_name_index)?.as_utf8()?;
                                 let catch_class = self.resolve_class_reference(catch_class_name.as_str())?;
                                 // Check if exception refers to catch_class or one of its subclasses
-                                let exception_class = exception.m_class.clone();
+                                let exception_class = exception.class().clone();
                                 let mut current_exception_class = exception_class;
                                 let mut ret_flag = false;
-                                while current_exception_class.has_super() {
-                                    if current_exception_class == catch_class {
+                                while current_exception_class.get_class_file().has_super() {
+                                    if Rc::ptr_eq(&current_exception_class, &catch_class) {
                                         ret_flag = true;
                                         break;
                                     }
-                                    current_exception_class = self.resolve_class_reference(current_exception_class.super_name().unwrap())?;
+                                    current_exception_class = self.resolve_class_reference(current_exception_class.get_class_file().super_name().unwrap())?;
                                 }
                                 ret_flag
                             }
@@ -722,15 +721,15 @@ impl JVM {
         let mut method_to_call = None; 
         {
             let mut found = false;
-            while current_class.has_super() && !found {
-                for method in current_class.methods() {
+            while current_class.get_class_file().has_super() && !found {
+                for method in current_class.get_class_file().methods() {
                     // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
                     // We still need to check for signature polymorphic functions.
-                    let method_descriptor = current_class.cp_entry(method.descriptor_index)?.as_utf8()?;
+                    let method_descriptor = current_class.get_class_file().cp_entry(method.descriptor_index)?.as_utf8()?;
                     if method_descriptor != descriptor {
                         continue;
                     }
-                    let method_name = current_class.cp_entry(method.name_index)?.as_utf8()?;
+                    let method_name = current_class.get_class_file().cp_entry(method.name_index)?.as_utf8()?;
                     if method_name == name {
                         method_to_call = Some(method.clone());
                         found = true;
@@ -739,7 +738,7 @@ impl JVM {
                 }   
                 // Recurse up the inheritance tree.
                 if !found { 
-                    current_class = self.resolve_class_reference(current_class.super_name().unwrap())?;
+                    current_class = self.resolve_class_reference(current_class.get_class_file().super_name().unwrap())?;
                 }
                 
             }
@@ -757,15 +756,15 @@ impl JVM {
         let mut method_to_call = None; 
         {
             let mut found = false;
-            while current_class.has_super() && !found {
-                for method in current_class.methods() {
+            while current_class.get_class_file().has_super() && !found {
+                for method in current_class.get_class_file().methods() {
                     // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
                     // We still need to check for signature polymorphic functions.
-                    let method_descriptor = current_class.cp_entry(method.descriptor_index)?.as_utf8()?;
+                    let method_descriptor = current_class.get_class_file().cp_entry(method.descriptor_index)?.as_utf8()?;
                     if method_descriptor != descriptor {
                         continue;
                     }
-                    let method_name = current_class.cp_entry(method.name_index)?.as_utf8()?;
+                    let method_name = current_class.get_class_file().cp_entry(method.name_index)?.as_utf8()?;
                     if method_name == name {
                         method_to_call = Some(method.clone());
                         found = true;
@@ -774,7 +773,7 @@ impl JVM {
                 }   
                 // Recurse up the inheritance tree.
                 if !found { 
-                    current_class = self.resolve_class_reference(current_class.super_name().unwrap())?;
+                    current_class = self.resolve_class_reference(current_class.get_class_file().super_name().unwrap())?;
                 }
                 
             }
@@ -790,7 +789,7 @@ impl JVM {
         let thread = access_macros::current_thread_mut!(self);
         let mut new_frame = Frame::new(c.clone(), method.clone());
         // Fill out the local variables.
-        let mut descriptor: &str = c.cp_entry(method.descriptor_index)?.as_utf8()?;
+        let mut descriptor: &str = c.get_class_file().cp_entry(method.descriptor_index)?.as_utf8()?;
         descriptor = &descriptor[0..descriptor.find(")").unwrap()]; // Skip past the return value
         descriptor = &descriptor[1..]; // Skip the beginning parenthesis.
         let locals = &mut new_frame.local_variables;
@@ -911,14 +910,14 @@ impl JVM {
                             }
                         }
                         else {
-                            if c.name() != self.m_main_class_name {
+                            if c.get_class_file().name() != self.m_main_class_name {
                                 panic!();
                             }
                             else {
                                 // TODO: Add actual arguments.
                                 let args = Array::new_ref(0, String::from("Ljava/lang/String;"));
-                                let args_ref = Reference::Array(args, Rc::new(Monitor::new()));
-                                Value::Reference(Rc::new(args_ref))
+                                let args_ref = Reference::Array(Rc::new(args), Rc::new(Monitor::new()));
+                                Value::Reference(args_ref)
                             }
                         }
                     };
@@ -941,22 +940,22 @@ impl JVM {
         locals.reverse(); // We have to push the variables in reverse order, so we correct it after.
         
         thread.push_frame(new_frame);
-        println!("Invoking {}{} in class {}", c.cp_entry(method.name_index)?.as_utf8()?, descriptor, c.name());
+        println!("Invoking {}{} in class {}", c.get_class_file().cp_entry(method.name_index)?.as_utf8()?, descriptor, c.get_class_file().name());
         Ok(())
     }
     pub fn execute_native_from_name(&mut self, name: &str, descriptor: &str, mut current_class: Rc<dyn Class>) -> Result<(), Error> {
         let mut method_to_call = None; 
         {
             let mut found = false;
-            while current_class.has_super() && !found {
-                for method in current_class.methods() {
+            while current_class.get_class_file().has_super() && !found {
+                for method in current_class.get_class_file().methods() {
                     // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
                     // We still need to check for signature polymorphic functions.
-                    let method_descriptor = current_class.cp_entry(method.descriptor_index)?.as_utf8()?;
+                    let method_descriptor = current_class.get_class_file().cp_entry(method.descriptor_index)?.as_utf8()?;
                     if method_descriptor != descriptor {
                         continue;
                     }
-                    let method_name = current_class.cp_entry(method.name_index)?.as_utf8()?;
+                    let method_name = current_class.get_class_file().cp_entry(method.name_index)?.as_utf8()?;
                     if method_name == name {
                         method_to_call = Some(method.clone());
                         found = true;
@@ -965,7 +964,7 @@ impl JVM {
                 }   
                 // Recurse up the inheritance tree.
                 if !found { 
-                    current_class = self.resolve_class_reference(current_class.super_name().unwrap())?; 
+                    current_class = self.resolve_class_reference(current_class.get_class_file().super_name().unwrap())?; 
                 }
                 
             }
@@ -978,9 +977,9 @@ impl JVM {
         self.execute_native(&method_to_call.unwrap(), current_class)
     }
     pub fn execute_native(&mut self, method: &MethodInfo, current_class: Rc<dyn Class>) -> Result<(), Error> {
-        let mname = current_class.cp_entry(method.name_index)?.as_utf8()?;
-        let mdesc = current_class.cp_entry(method.descriptor_index)?.as_utf8()?;
-        let cname = current_class.name();
+        let mname = current_class.get_class_file().cp_entry(method.name_index)?.as_utf8()?;
+        let mdesc = current_class.get_class_file().cp_entry(method.descriptor_index)?.as_utf8()?;
+        let cname = current_class.get_class_file().name();
         match cname {
             "java/lang/String" => {
                 match mname.as_str() {
@@ -1020,7 +1019,7 @@ impl JVM {
         // We have to create an instance of the class. 
         // To do this we call the private constructor with the classloader and the array component type
         // Since we don't have class loaders, this is always null for now
-        let loader = Value::Reference(Rc::new(Reference::Null));
+        let loader = Value::Reference(Reference::Null);
         let thread = access_macros::current_thread_mut!(self);
         let frame = access_macros::current_frame_mut!(thread);
         frame.op_stack.push(loader);
@@ -1042,7 +1041,7 @@ impl JVM {
                 }
             }
             else { 
-                frame.op_stack.push(Value::Reference(Rc::new(Reference::Null)));
+                frame.op_stack.push(Value::Reference(Reference::Null));
             }
         };
         // This may not work right, idk how exactly it should work. This will probably need explicit support from the vm in the future.

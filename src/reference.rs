@@ -8,6 +8,7 @@ use crate::class::Class;
 use crate::errorcodes::Error;
 use crate::reference::object::Object;
 
+use std::cell::Ref;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -76,17 +77,17 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Clone for Reference<C, O> {
 
 // Should we make a wrapper for Array::new_multi?
 
-impl<C: Class + ?Sized, O: Object + ?Sized>  Reference<C, O> {
-    pub fn new() -> Reference<C, O> {
+impl  Reference<dyn Class, dyn Object> {
+    pub fn new() -> Reference<dyn Class, dyn Object> {
         Reference::Null
     }
-    pub fn new_refarray(size: usize, descriptor: String) -> Reference<C, O> {
+    pub fn new_refarray(size: usize, descriptor: String) -> Reference<dyn Class, dyn Object> {
         Reference::Array(Rc::new(Array::new_ref(size, descriptor)), Rc::new(Monitor::new()))
     }
-    pub fn new_array(size: usize, atype: u8) ->  Reference<C, O> {
+    pub fn new_array(size: usize, atype: u8) ->  Reference<dyn Class, dyn Object> {
         Reference::Array(Rc::new(Array::new(size, atype)), Rc::new(Monitor::new()))
     }
-    pub fn new_interface(c: Rc<C>) ->  Reference<C, O> {
+    pub fn new_interface<CC: Class + ?Sized>(c: Rc<CC>) ->  Reference<CC, dyn Object> {
         Reference::Interface(c, Rc::new(Monitor::new()))
     }
     pub fn new_object(current_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Reference<dyn Class, dyn Object>, Error> {
@@ -94,14 +95,14 @@ impl<C: Class + ?Sized, O: Object + ?Sized>  Reference<C, O> {
     }
 
     // Again, the runtime hit hurts, but we need to test while the design is still unstable, and I can't think of a better solution. 
-    pub fn to_refarray(reference: Reference<C, O>, size: usize, descriptor: String) -> Result<Reference<C, O>, Error> {
+    pub fn to_refarray(reference: Reference<dyn Class, dyn Object>, size: usize, descriptor: String) -> Result<Reference<dyn Class, dyn Object>, Error> {
         // As far as I understand it, this should make ref illegal to use after this function.
         match reference {
             Reference::Null => Ok(Reference::new_refarray(size, descriptor)),
             _ => Err(Error::IllegalReferenceCastToArray),
         }
     }
-    pub fn to_interface<CC: Class>(reference: Reference<C, O>, c: Rc<CC>) -> Result<Reference<CC, O>, Error> {
+    pub fn to_interface<CC: Class>(reference: Reference<dyn Class, dyn Object>, c: Rc<CC>) -> Result<Reference<CC, dyn Object>, Error> {
         match reference {
             Reference::Null => Ok(Reference::new_interface(c)),
             _ => Err(Error::IllegalReferenceCastToInterface),
@@ -168,4 +169,5 @@ impl PartialEq for Reference<dyn Class, dyn Object> {
         !self.eq(other)
     }
 }
+
 

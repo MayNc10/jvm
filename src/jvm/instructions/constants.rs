@@ -392,7 +392,7 @@ pub mod ldc {
         }
     }
     pub struct LDCString {
-        s: Reference<dyn Class, dyn Object>, 
+        pub s: Reference<dyn Class, dyn Object>, 
     }
     impl LDCFunc for LDCString {
         fn execute(&mut self, jvm : &mut JVM) -> Result<(), Error> {
@@ -403,7 +403,7 @@ pub mod ldc {
         }
     }
     pub struct LDCClass {
-        c_name: String,
+        pub c_name: String,
     }
     impl LDCFunc for LDCClass {
         fn execute(&mut self, jvm : &mut JVM) -> Result<(), Error> {
@@ -411,7 +411,7 @@ pub mod ldc {
         }
     }
     pub struct LDCMethodType {
-        desc: &'static str, // Same idea as above
+        pub desc: &'static str, // Same idea as above
     }
     impl LDCFunc for LDCMethodType {
         fn execute(&mut self, jvm : &mut JVM) -> Result<(), Error> {
@@ -446,7 +446,8 @@ impl Instruction for LDC<dyn ldc::LDCFunc> {
         }
         else {
             // First, get the constant pool entry at that index.
-            let entry = c.get_class_file().cp_entry(unsafe {
+            let c_file = c.get_class_file();
+            let entry = c_file.cp_entry(unsafe {
                 u16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())  
             })?;
             let f = match entry {

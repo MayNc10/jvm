@@ -9,9 +9,9 @@ pub struct CustomClass {
     static_fields: HashMap<NameAndType, Rc<Value<dyn Class, dyn Object>>>, 
 }
 
-impl<'a> Class for CustomClass {
+impl Class for CustomClass {
     // We could use a different type than NameAndType for the &Strings, but this is simpler and terribly slow.
-    fn new(jvm: &mut JVM, file: classfile::ClassFile) -> Result<Self, Error> where Self : Sized {
+    fn new(file: classfile::ClassFile) -> Result<Self, Error> where Self : Sized {
         let mut static_fields = HashMap::new();
         // Fill in static fields.
         for field in &file.fields {
@@ -135,7 +135,9 @@ impl<'a> Class for CustomClass {
             Err(Error::NoSuchFieldError(Opcode::PUTSTATIC))
         }
         else {
-            jvm.resolve_class_reference(self.class_file.super_name().unwrap())?.put_static(name, descriptor, value, jvm)
+            unsafe {
+                Rc::get_mut_unchecked(&mut jvm.resolve_class_reference(self.class_file.super_name().unwrap())?)
+            }.put_static(name, descriptor, value, jvm)
         }
         
     }
@@ -146,6 +148,9 @@ impl<'a> Class for CustomClass {
         self.class_file.clone()
     }
     fn as_dyn_rc(self: Rc<Self>) -> Rc<dyn Class> {
+        self
+    }
+    fn as_any(&self) ->  &dyn Any {
         self
     }
     fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any> {

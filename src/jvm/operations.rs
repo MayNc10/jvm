@@ -168,7 +168,8 @@ impl JVM {
         thread.inc_pc(2)?;
         let frame = access_macros::current_frame_mut!(thread);
         // First, get the constant pool entry at that index.
-        let entry = frame.rt_const_pool.get_class_file().cp_entry(frame.current_method.code()?[pc] as u16)?;
+        let rt_class_file = frame.rt_const_pool.get_class_file();
+        let entry = rt_class_file.cp_entry(frame.current_method.code()?[pc] as u16)?;
         match entry {
             Entry::Integer(i) => frame.op_stack.push(Value::Int(*i)),
             Entry::Float(f) => frame.op_stack.push(Value::Float(*f)),
@@ -179,7 +180,8 @@ impl JVM {
                 // Instead, we are taking the path of creating a new String instance.
                 // First, we create the new String.
                 let current_class = Rc::clone(&frame.rt_const_pool);
-                let s_raw = current_class.get_class_file().cp_entry(*s)?.as_utf8()?; 
+                let current_class_file = current_class.get_class_file();
+                let s_raw = current_class_file.cp_entry(*s)?.as_utf8()?; 
                 let s_obj = object::new_object("java/lang/String", self)?;
                 let string_class = Rc::clone(&s_obj.class());
                 let s_ref = Reference::Object(s_obj.clone(), Rc::new(Monitor::new()));             
@@ -189,7 +191,7 @@ impl JVM {
                 let carray_asref = Reference::Array(carray.clone(), Rc::new(Monitor::new()));
                 let thread = access_macros::current_thread_mut!(self);
                 let frame = access_macros::current_frame_mut!(thread);
-                frame.op_stack.push(Value::Reference(s_ref));
+                frame.op_stack.push(Value::Reference(s_ref.clone()));
                 frame.op_stack.push(Value::Reference(s_ref)); // duplicate the value, so we still have one afterwards.
                 frame.op_stack.push(Value::Reference(carray_asref));
                 frame.op_stack.push(Value::Int(0));
@@ -257,8 +259,8 @@ impl JVM {
         let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
-
-        let entry = frame.rt_const_pool.get_class_file().cp_entry(frame.current_method.code()?[pc] as u16 + 
+        let rt_class_file = frame.rt_const_pool.get_class_file();
+        let entry = rt_class_file.cp_entry(frame.current_method.code()?[pc] as u16 + 
                                                                 frame.current_method.code()?[pc + 1] as u16)?;
         match entry {
             Entry::Integer(i) => frame.op_stack.push(Value::Int(*i)),
@@ -329,8 +331,8 @@ impl JVM {
         let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
-
-        let entry = frame.rt_const_pool.get_class_file().cp_entry(frame.current_method.code()?[pc] as u16 + 
+        let rt_class_file = frame.rt_const_pool.get_class_file();
+        let entry = rt_class_file.cp_entry(frame.current_method.code()?[pc] as u16 + 
                                                                 frame.current_method.code()?[pc + 1] as u16 )?;
         match entry {
             Entry::Double(d) => {
@@ -1122,15 +1124,15 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::IASTORE)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
-        let array = match arrayref_rc {
+        let arrayref_rc = arrayref.as_reference_mut()?;
+        let mut array = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::IASTORE)),
         };
         if !array.is_iarray() {
             return Err(Error::IncorrectReferenceType(Opcode::IASTORE));
         }
-        array.set(*index.as_int()? as usize, val)?;
+        unsafe {Rc::get_mut_unchecked(&mut array)}.set(*index.as_int()? as usize, val)?;
         Ok(())
     }
     pub fn lastore(&mut self) -> Result<(), Error> {
@@ -1152,15 +1154,15 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::LASTORE)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
-        let array = match arrayref_rc {
+        let arrayref_rc = arrayref.as_reference_mut()?;
+        let mut array = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::LASTORE)),
         };
         if !array.is_larray() {
             return Err(Error::IncorrectReferenceType(Opcode::LASTORE));
         }
-        array.set(*index.as_int()? as usize, val)?;
+        unsafe {Rc::get_mut_unchecked(&mut array)}.set(*index.as_int()? as usize, val)?;
         Ok(())
     }    
     pub fn fastore(&mut self) -> Result<(), Error> {
@@ -1182,15 +1184,15 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::FASTORE)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
-        let array = match arrayref_rc {
+        let arrayref_rc = arrayref.as_reference_mut()?;
+        let mut array = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::FASTORE)),
         };
         if !array.is_farray() {
             return Err(Error::IncorrectReferenceType(Opcode::FASTORE));
         }
-        array.set(*index.as_int()? as usize, val)?;
+        unsafe {Rc::get_mut_unchecked(&mut array)}.set(*index.as_int()? as usize, val)?;
         Ok(())
     }
     pub fn dastore(&mut self) -> Result<(), Error> {
@@ -1212,15 +1214,15 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::DASTORE)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
-        let array = match arrayref_rc {
+        let arrayref_rc = arrayref.as_reference_mut()?;
+        let mut array = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::DASTORE)),
         };
         if !array.is_darray() {
             return Err(Error::IncorrectReferenceType(Opcode::DASTORE));
         }
-        array.set(*index.as_int()? as usize, val)?;
+        unsafe {Rc::get_mut_unchecked(&mut array)}.set(*index.as_int()? as usize, val)?;
         Ok(())
     }
     // This function needs some work: https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-6.html#jvms-6.5.aastore
@@ -1243,8 +1245,8 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::AASTORE)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
-        let array = match arrayref_rc {
+        let arrayref_rc = arrayref.as_reference_mut()?;
+        let mut array = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::IncorrectReferenceType(Opcode::AASTORE)),
         };
@@ -1263,6 +1265,7 @@ impl JVM {
             Reference::Object(o, _) => {
             },           
         }
+        unsafe {Rc::get_mut_unchecked(&mut array)}.set(*index.as_int()? as usize, val)?;
         Ok(())
     }
     pub fn bastore(&mut self) -> Result<(), Error> {
@@ -1284,15 +1287,15 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::BASTORE)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
-        let array = match arrayref_rc {
+        let arrayref_rc = arrayref.as_reference_mut()?;
+        let mut array = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::BASTORE)),
         };
         if !array.is_barray() {
             return Err(Error::IncorrectReferenceType(Opcode::BASTORE));
         }
-        array.set(*index.as_int()? as usize, val)?;
+        unsafe {Rc::get_mut_unchecked(&mut array)}.set(*index.as_int()? as usize, val)?;
         Ok(())
     }
     pub fn castore(&mut self) -> Result<(), Error> {
@@ -1314,15 +1317,15 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::CASTORE)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
-        let array = match arrayref_rc {
+        let arrayref_rc = arrayref.as_reference_mut()?;
+        let mut array = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::CASTORE)),
         };
         if !array.is_carray() {
             return Err(Error::IncorrectReferenceType(Opcode::CASTORE));
         }
-        array.set(*index.as_int()? as usize, val)?;
+        unsafe {Rc::get_mut_unchecked(&mut array)}.set(*index.as_int()? as usize, val)?;
         Ok(())
     }
     pub fn sastore(&mut self) -> Result<(), Error> {
@@ -1344,15 +1347,15 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::SASTORE)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
-        let array = match arrayref_rc {
+        let arrayref_rc = arrayref.as_reference_mut()?;
+        let mut array = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::SASTORE)),
         };
         if !array.is_sarray() {
             return Err(Error::IncorrectReferenceType(Opcode::SASTORE));
         }
-        array.set(*index.as_int()? as usize, val)?;
+        unsafe {Rc::get_mut_unchecked(&mut array)}.set(*index.as_int()? as usize, val)?;
         Ok(())
     }
     // Stack
@@ -3042,9 +3045,10 @@ impl JVM {
             };
             frame.op_stack = Vec::new();
             let current_class = Rc::clone(&frame.rt_const_pool);
+            let current_class_file = current_class.get_class_file();
             {
-                let ret_descriptor = frame.current_method.return_descriptor(&current_class.get_class_file())?;
-                let mut ret_ref = ret_val.as_reference()?;
+                let ret_descriptor = frame.current_method.return_descriptor(&current_class_file)?;
+                let ret_ref = ret_val.as_reference()?;
                 // This is my understanding of the rules regarding reference type assignment compatibility:
                 // If a type is Null, it matches with any reference type. 
                 // If a type is an array, it is therefore an instance of java.lang.reflect.Array, and so can be assigned with an array or the class Object.
@@ -3064,16 +3068,17 @@ impl JVM {
                     },
                     Reference::Object(o, _) => {
                         let mut current_class = o.class().clone();
+                        let mut current_class_file = current_class.get_class_file();
                         let mut found = false;
                         // These nested loops are rough, they should be tested and probably refactored.
-                        while current_class.get_class_file().has_super() && found == false {
-                            if current_class.get_class_file().name() == ret_descriptor {
+                        while current_class_file.has_super() && found == false {
+                            if current_class_file.name() == ret_descriptor {
                                 found = true;
                                 break;
                             }
-                            for interface_index in current_class.get_class_file().interfaces() {
-                                let interface = current_class.get_class_file().cp_entry(*interface_index)?.as_class()?;
-                                let mut current_interface = self.resolve_class_reference(current_class.get_class_file().cp_entry(*interface)?.as_utf8()?)?;
+                            for interface_index in current_class_file.interfaces() {
+                                let interface = current_class_file.cp_entry(*interface_index)?.as_class()?;
+                                let mut current_interface = self.resolve_class_reference(current_class_file.cp_entry(*interface)?.as_utf8()?)?;
                                 let mut found_interface = false;
                                 while current_interface.get_class_file().has_super() {
                                     if current_interface.get_class_file().name() == ret_descriptor {
@@ -3087,7 +3092,8 @@ impl JVM {
                                     break;
                                 }
                             }
-                            current_class = self.resolve_class_reference(current_class.get_class_file().super_name().unwrap())?;
+                            current_class = self.resolve_class_reference(current_class_file.super_name().unwrap())?;
+                            current_class_file = current_class.get_class_file();
                         }
                         if !found {
                             return Err(Error::IncompatibleReturnType(Opcode::ARETURN));
@@ -3147,13 +3153,14 @@ impl JVM {
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
         let current_class = Rc::clone(&frame.rt_const_pool);
-        let field = current_class.get_class_file().cp_entry(index)?.as_field_ref()?;
-        let class_index = current_class.get_class_file().cp_entry(field.class_index)?.as_class()?;
-        let class_name = current_class.get_class_file().cp_entry(*class_index)?.as_utf8()?;
+        let current_class_file = current_class.get_class_file();
+        let field = current_class_file.cp_entry(index)?.as_field_ref()?;
+        let class_index = current_class_file.cp_entry(field.class_index)?.as_class()?;
+        let class_name = current_class_file.cp_entry(*class_index)?.as_utf8()?;
         let class = self.resolve_class_reference(class_name)?;
-        let name_and_type = current_class.get_class_file().cp_entry(field.name_and_type_index)?.as_name_and_type()?;
-        let name = current_class.get_class_file().cp_entry(name_and_type.name_index)?.as_utf8()?;
-        let descriptor = current_class.get_class_file().cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
+        let name_and_type = current_class_file.cp_entry(field.name_and_type_index)?.as_name_and_type()?;
+        let name = current_class_file.cp_entry(name_and_type.name_index)?.as_utf8()?;
+        let descriptor = current_class_file.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
         let field = class.get_static(name, &descriptor, self)?;
         let new_value;
         // If this value is a "copy" type, we make a new Value. Otherwise, we use the reference inside to make a new value.       
@@ -3176,13 +3183,14 @@ impl JVM {
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
         let current_class = Rc::clone(&frame.rt_const_pool);
-        let field = current_class.get_class_file().cp_entry(index)?.as_field_ref()?;
-        let class_index = current_class.get_class_file().cp_entry(field.class_index)?.as_class()?;
-        let class_name = current_class.get_class_file().cp_entry(*class_index)?.as_utf8()?;
+        let current_class_file = current_class.get_class_file();
+        let field = current_class_file.cp_entry(index)?.as_field_ref()?;
+        let class_index = current_class_file.cp_entry(field.class_index)?.as_class()?;
+        let class_name = current_class_file.cp_entry(*class_index)?.as_utf8()?;
         let mut class = self.resolve_class_reference(&class_name)?;
-        let name_and_type = current_class.get_class_file().cp_entry(field.name_and_type_index)?.as_name_and_type()?;
-        let name = current_class.get_class_file().cp_entry(name_and_type.name_index)?.as_utf8()?;
-        let descriptor = current_class.get_class_file().cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
+        let name_and_type = current_class_file.cp_entry(field.name_and_type_index)?.as_name_and_type()?;
+        let name = current_class_file.cp_entry(name_and_type.name_index)?.as_utf8()?;
+        let descriptor = current_class_file.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
         let thread = access_macros::current_thread_mut!(self);
         let frame = access_macros::current_frame_mut!(thread);
         let field = match frame.op_stack.pop() {
@@ -3228,15 +3236,16 @@ impl JVM {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::PUTFIELD)),
         };
-        let mut object_ref = match frame.op_stack.pop() {
+        let object_ref = match frame.op_stack.pop() {
             Some(mut v) => v.as_reference_mut()?,
             None => return Err(Error::StackUnderflow(Opcode::PUTFIELD)),
         };
-        let object = match object_ref {
+        let mut object = match object_ref {
             Reference::Object(o, _) => o,
             _ => return Err(Error::IncorrectReferenceType(Opcode::PUTFIELD)),
         };
-        object.put_field(frame.rt_const_pool.clone(), index, self, val)?;
+        unsafe {Rc::get_mut_unchecked(&mut object)}
+        .put_field(frame.rt_const_pool.clone(), index, self, val)?;
         Ok(())
     }
     pub fn invokevirtual(&mut self) -> Result<(), Error> {
@@ -3245,16 +3254,18 @@ impl JVM {
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
         let current_class = Rc::clone(&frame.rt_const_pool);
+        let current_class_file = current_class.get_class_file();
         let (mut c, name, descriptor) = {
             let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);   
-            let method_ref = current_class.get_class_file().cp_entry(index)?.as_method_ref()?;
-            let name_and_type = current_class.get_class_file().cp_entry(method_ref.name_and_type_index)?.as_name_and_type()?;
-            let name = current_class.get_class_file().cp_entry(name_and_type.name_index)?.as_utf8()?;
-            let descriptor = current_class.get_class_file().cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
-            let c_info = current_class.get_class_file().cp_entry(method_ref.class_index)?.as_class()?;
-            let c_name = current_class.get_class_file().cp_entry(*c_info)?.as_utf8()?;
+            let method_ref = current_class_file.cp_entry(index)?.as_method_ref()?;
+            let name_and_type = current_class_file.cp_entry(method_ref.name_and_type_index)?.as_name_and_type()?;
+            let name = current_class_file.cp_entry(name_and_type.name_index)?.as_utf8()?;
+            let descriptor = current_class_file.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
+            let c_info = current_class_file.cp_entry(method_ref.class_index)?.as_class()?;
+            let c_name = current_class_file.cp_entry(*c_info)?.as_utf8()?;
             (self.resolve_class_reference(c_name.clone().as_str())?, name, descriptor)
         };
+        let c_file = c.get_class_file();
         let thread = access_macros::current_thread_mut!(self);
         let frame = access_macros::current_frame_mut!(thread);
         let object_val = match frame.op_stack.pop() {
@@ -3270,15 +3281,15 @@ impl JVM {
         // Resolve method
         {
             let mut found = false;
-            while c.get_class_file().has_super() && !found {
-                for method in c.get_class_file().methods() {
+            while c_file.has_super() && !found {
+                for method in c_file.methods() {
                     // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
                     // We still need to check for signature polymorphic functions.
-                    let method_descriptor = c.get_class_file().cp_entry(method.descriptor_index)?.as_utf8()?;
+                    let method_descriptor = c_file.cp_entry(method.descriptor_index)?.as_utf8()?;
                     if method_descriptor != descriptor {
                         continue;
                     }
-                    let method_name = c.get_class_file().cp_entry(method.name_index)?.as_utf8()?;
+                    let method_name = c_file.cp_entry(method.name_index)?.as_utf8()?;
                     if method_name == name {
                         method_to_call = Some(method.clone());
                         found = true;
@@ -3301,16 +3312,17 @@ impl JVM {
             // search the methods of the object to see if we can override. 
             if (resolved_method.access_flags.flags & flags::method::ACC_PRIVATE) == 0 {
                 let mut obj_c = object.class().clone();
+                let mut obj_c_file = obj_c.get_class_file();
                 let mut found = false;
                 while obj_c.get_class_file().has_super() && !found {
                     for method in obj_c.get_class_file().methods() {
                         // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
                         // We still need to check for signature polymorphic functions.
-                        let method_descriptor = obj_c.get_class_file().cp_entry(method.descriptor_index)?.as_utf8()?;
+                        let method_descriptor = obj_c_file.cp_entry(method.descriptor_index)?.as_utf8()?;
                         if method_descriptor != descriptor {
                             continue;
                         }
-                        let method_name = obj_c.get_class_file().cp_entry(method.name_index)?.as_utf8()?;
+                        let method_name = obj_c_file.cp_entry(method.name_index)?.as_utf8()?;
                         if method_name != name {
                             continue;
                         }
@@ -3322,6 +3334,7 @@ impl JVM {
                     // Recurse up the inheritance tree.
                     if !found {
                         obj_c = self.resolve_class_reference(obj_c.get_class_file().super_name().unwrap())?;
+                        obj_c_file = obj_c.get_class_file();
                     }
                     
                 }
@@ -3348,19 +3361,22 @@ impl JVM {
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16); 
-        let entry = frame.rt_const_pool.get_class_file().cp_entry(index)?;
+        let rt_file = frame.rt_const_pool.get_class_file();
+        let entry = rt_file.cp_entry(index)?;
         let (method_ref, is_interface) = match entry {
             Entry::MethodRef(refinfo) => (refinfo, false),
             Entry::InterfaceMethodRef(refinfo) => (refinfo, true),
             _ => return Err(Error::IllegalConstantLoad(Opcode::INVOKESTATIC)),
         };
         let current_class = Rc::clone(&frame.rt_const_pool);
-        let name_and_type = current_class.get_class_file().cp_entry(method_ref.name_and_type_index)?.as_name_and_type()?;
-        let name = current_class.get_class_file().cp_entry(name_and_type.name_index)?.as_utf8()?;
-        let descriptor = current_class.get_class_file().cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
-        let c_info = current_class.get_class_file().cp_entry(method_ref.class_index)?.as_class()?;
-        let c_name = current_class.get_class_file().cp_entry(*c_info)?.as_utf8()?;
+        let current_class_file = current_class.get_class_file();
+        let name_and_type = current_class_file.cp_entry(method_ref.name_and_type_index)?.as_name_and_type()?;
+        let name = current_class_file.cp_entry(name_and_type.name_index)?.as_utf8()?;
+        let descriptor = current_class_file.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
+        let c_info = current_class_file.cp_entry(method_ref.class_index)?.as_class()?;
+        let c_name = current_class_file.cp_entry(*c_info)?.as_utf8()?;
         let mut c = self.resolve_class_reference(c_name)?;
+        let mut c_file = c.get_class_file();
         if (c.get_class_file().access_flags().flags & flags::class::ACC_INTERFACE) > 0 {
             return Err(Error::IncompatibleClassChangeError(Opcode::INVOKESPECIAL));
         } 
@@ -3368,15 +3384,15 @@ impl JVM {
         let mut resolved_method_wrapped = None; 
         {
             let mut found = false;
-            while c.get_class_file().has_super() && !found {
-                for method in c.get_class_file().methods() {
+            while c_file.has_super() && !found {
+                for method in c_file.methods() {
                     // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
                     // We still need to check for signature polymorphic functions.
-                    let method_descriptor = c.get_class_file().cp_entry(method.descriptor_index)?.as_utf8()?;
+                    let method_descriptor = c_file.cp_entry(method.descriptor_index)?.as_utf8()?;
                     if method_descriptor != descriptor {
                         continue;
                     }
-                    let method_name = c.get_class_file().cp_entry(method.name_index)?.as_utf8()?;
+                    let method_name = c_file.cp_entry(method.name_index)?.as_utf8()?;
                     if method_name == name {
                         resolved_method_wrapped = Some(method.clone());
                         found = true;
@@ -3385,7 +3401,8 @@ impl JVM {
                 }   
                 // Recurse up the inheritance tree.
                 if !found {
-                    c = self.resolve_class_reference(c.get_class_file().super_name().unwrap())?;
+                    c = self.resolve_class_reference(c_file.super_name().unwrap())?;
+                    c_file = c.get_class_file();
                 }
                 
             }
@@ -3396,20 +3413,23 @@ impl JVM {
         }
         let mut resolved_method = resolved_method_wrapped.unwrap();
         let resolved_method_class = Rc::clone(&c); // Save the originating class of resolved_method so we can index it.
-        let resolved_name = resolved_method_class.get_class_file().cp_entry(resolved_method.name_index)?.as_utf8()?;
-        let resolved_desc = resolved_method_class.get_class_file().cp_entry(resolved_method.descriptor_index)?.as_utf8()?;
+        let res_method_file = resolved_method_class.get_class_file();
+        let resolved_name = res_method_file.cp_entry(resolved_method.name_index)?.as_utf8()?;
+        let resolved_desc = res_method_file.cp_entry(resolved_method.descriptor_index)?.as_utf8()?;
         // Next, possibly change C
         if (c.get_class_file().cp_entry(resolved_method.name_index)?.as_utf8()? != "<init>") && current_class.get_class_file().has_super() && ({
             // Figure out if c is a superclass of current_class
             let mut temp = Rc::clone(&current_class);
+            let mut temp_file = temp.get_class_file();
             let mut res = false;
-            while temp.get_class_file().has_super() {
-                let super_name = temp.get_class_file().super_name().unwrap();
+            while temp_file.has_super() {
+                let super_name = temp_file.super_name().unwrap();
                 if super_name == c.get_class_file().name() {
                     res = true;
                     break;
                 }
                 temp = self.resolve_class_reference(super_name)?;
+                temp_file = temp.get_class_file();
             }
             res
         })
@@ -3484,7 +3504,7 @@ impl JVM {
             };
             match object {
                 Reference::Null => return Err(Error::NullPointerException(Opcode::MONITORENTER)),
-                Reference::Array(_, mrc) | Reference::Interface(_, mrc) | Reference::Object(_, mrc) => {
+                Reference::Array(_, mut mrc) | Reference::Interface(_, mut mrc) | Reference::Object(_, mut mrc) => {
                     let m = unsafe { Rc::get_mut_unchecked(&mut mrc)};
                     let success = m.try_enter(current_thread_number);
                     if !success {
@@ -3505,20 +3525,23 @@ impl JVM {
         let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
+        let rt_file = frame.rt_const_pool.get_class_file();
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);     
-        let entry = frame.rt_const_pool.get_class_file().cp_entry(index)?;
+        let entry = rt_file.cp_entry(index)?;
         let (method_ref, is_interface) = match entry {
             Entry::MethodRef(refinfo) => (refinfo, false),
             Entry::InterfaceMethodRef(refinfo) => (refinfo, true),
             _ => return Err(Error::IllegalConstantLoad(Opcode::INVOKESTATIC)),
         };
         let current_class = Rc::clone(&frame.rt_const_pool);
-        let name_and_type = current_class.get_class_file().cp_entry(method_ref.name_and_type_index)?.as_name_and_type()?;
-        let name = current_class.get_class_file().cp_entry(name_and_type.name_index)?.as_utf8()?;
-        let descriptor = current_class.get_class_file().cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
-        let c_info = current_class.get_class_file().cp_entry(method_ref.class_index)?.as_class()?;
-        let c_name = current_class.get_class_file().cp_entry(*c_info)?.as_utf8()?;
+        let current_class_file = current_class.get_class_file();
+        let name_and_type = current_class_file.cp_entry(method_ref.name_and_type_index)?.as_name_and_type()?;
+        let name = current_class_file.cp_entry(name_and_type.name_index)?.as_utf8()?;
+        let descriptor = current_class_file.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
+        let c_info = current_class_file.cp_entry(method_ref.class_index)?.as_class()?;
+        let c_name = current_class_file.cp_entry(*c_info)?.as_utf8()?;
         let mut c = self.resolve_class_reference(c_name)?;
+        let mut c_file = c.get_class_file();
         if is_interface {
             if !((c.get_class_file().access_flags().flags & flags::class::ACC_INTERFACE) > 0) {
                 return Err(Error::IncompatibleMethodRefAndClass(Opcode::INVOKESTATIC));
@@ -3533,15 +3556,15 @@ impl JVM {
         // Resolve method
         {
             let mut found = false;
-            while c.get_class_file().has_super() && !found {
-                for method in c.get_class_file().methods() {
+            while c_file.has_super() && !found {
+                for method in c_file.methods() {
                     // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
                     // We still need to check for signature polymorphic functions.
-                    let method_descriptor = c.get_class_file().cp_entry(method.descriptor_index)?.as_utf8()?;
+                    let method_descriptor = c_file.cp_entry(method.descriptor_index)?.as_utf8()?;
                     if method_descriptor != descriptor {
                         continue;
                     }
-                    let method_name = c.get_class_file().cp_entry(method.name_index)?.as_utf8()?;
+                    let method_name = c_file.cp_entry(method.name_index)?.as_utf8()?;
                     if method_name == name {
                         method_to_call = Some(method.clone());
                         found = true;
@@ -3551,6 +3574,7 @@ impl JVM {
                 // Recurse up the inheritance tree.
                 if !found {
                     c = self.resolve_class_reference(c.get_class_file().super_name().unwrap())?;
+                    c_file = c.get_class_file();
                 }
                 
             }
@@ -3583,12 +3607,13 @@ impl JVM {
         let pc = thread.pc() + 1;
         thread.inc_pc(5)?; // the 5 is intentional
         let frame = access_macros::current_frame_mut!(thread);
+        let rt_file = frame.rt_const_pool.get_class_file();
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
         // Resolve the index into an instance of java.lang.invoke.CallSite.
         // This procedure also occurs in ldc, so this should be a subroutine.
-        let invoke_dynamic_info = frame.rt_const_pool.get_class_file().cp_entry(index)?.as_invoke_dynamic()?;
+        let invoke_dynamic_info = rt_file.cp_entry(index)?.as_invoke_dynamic()?;
         let bootstrap_index = invoke_dynamic_info.bootstrap_method_attr_index;
-        let bootstrap_methods = match &frame.rt_const_pool.get_class_file().bootstrap_methods {
+        let bootstrap_methods = match &rt_file.bootstrap_methods {
             Some(m) => m,
             None => return Err(Error::MissingBootstrapTable(Opcode::INVOKEDYNAMIC)),
         };
@@ -3657,14 +3682,15 @@ impl JVM {
         let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
+        let rt_file = frame.rt_const_pool.get_class_file();
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
         let count = match frame.op_stack.pop() {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::PUTFIELD)),
         };
         let descriptor = {
-            let class_ref = frame.rt_const_pool.get_class_file().cp_entry(index)?.as_class()?;
-            let class_name = frame.rt_const_pool.get_class_file().cp_entry(*class_ref)?.as_utf8()?;
+            let class_ref = rt_file.cp_entry(index)?.as_class()?;
+            let class_name = rt_file.cp_entry(*class_ref)?.as_utf8()?;
             // We actually just need the descriptor.
             // The Array descriptor represents the descriptor for the array, not for the component type, and so we need to add an extra '['.
             format!("[{}", class_name.clone())          
@@ -3704,11 +3730,10 @@ impl JVM {
             if len == 0 {
                 return Err(Error::StackUnderflow(Opcode::ATHROW));
             }
-            let objectref_rc = match &frame.op_stack[len - 1] {
-                Value::Reference(r) => r,
+            let objectref = match &frame.op_stack[len - 1] {
+                Value::Reference(r) => r.clone(),
                 _ => return Err(Error::UnexpectedTypeOnStack(Opcode::ATHROW)),
             };
-            let objectref = &*objectref_rc;
             drop(frame);
             drop(thread);            
             match objectref {
@@ -3742,7 +3767,7 @@ impl JVM {
         let op_stack_len = frame.op_stack.len();
         let objectref = &frame.op_stack[op_stack_len - 1].as_reference()?;
         let name: String;
-        let object_desc = match *objectref {
+        let object_desc = match objectref {
             Reference::Array(a, _) => a.descriptor(),
             Reference::Interface(i, _) => {
                 name = format!("L{}", i.get_class_file().name());
@@ -3756,8 +3781,9 @@ impl JVM {
             Reference::Null => return Ok(()),
         };
         let class = Rc::clone(&frame.rt_const_pool);
-        let class_reference = *class.get_class_file().cp_entry(index)?.as_class()?;
-        let class_desc = class.get_class_file().cp_entry(class_reference)?.as_utf8()?.as_str();
+        let class_file = class.get_class_file();
+        let class_reference = *class_file.cp_entry(index)?.as_class()?;
+        let class_desc = class_file.cp_entry(class_reference)?.as_utf8()?.as_str();
         drop(frame);
         drop(thread);
         if self.check_class(object_desc, class_desc)? {
@@ -3777,8 +3803,12 @@ impl JVM {
             None => return Err(Error::StackUnderflow(Opcode::INSTANCEOF)),
         };
         let name: String;
+        let possible_array_class;
         let object_desc = match objectref {
-            Reference::Array(a, _) => a.descriptor(),
+            Reference::Array(a, _) => {
+                possible_array_class = Some(a);
+                possible_array_class.as_ref().unwrap().descriptor()
+            },
             Reference::Interface(i, _) => {
                 name = format!("L{}", i.get_class_file().name());
                 name.as_str()
@@ -3794,8 +3824,9 @@ impl JVM {
             },
         };
         let class = Rc::clone(&frame.rt_const_pool);
-        let class_reference = *class.get_class_file().cp_entry(index)?.as_class()?;
-        let class_desc = class.get_class_file().cp_entry(class_reference)?.as_utf8()?.as_str();
+        let class_file = class.get_class_file();
+        let class_reference = *class_file.cp_entry(index)?.as_class()?;
+        let class_desc = class_file.cp_entry(class_reference)?.as_utf8()?.as_str();
         drop(frame);
         drop(thread);
         if self.check_class(object_desc, class_desc)? {
@@ -3820,7 +3851,7 @@ impl JVM {
         };
         match object {
             Reference::Null => return Err(Error::NullPointerException(Opcode::MONITORENTER)),
-            Reference::Array(_, mrc) | Reference::Interface(_, mrc) | Reference::Object(_, mrc) => {
+            Reference::Array(_, mut mrc) | Reference::Interface(_, mut mrc) | Reference::Object(_, mut mrc) => {
                 let m = match Rc::get_mut(&mut mrc) {
                     Some(m) => m,
                     None => return Err(Error::DoubleMutableReferenceToMonitor(Opcode::MONITORENTER)),
@@ -3838,13 +3869,13 @@ impl JVM {
         let thread = access_macros::current_thread_mut!(self);
         thread.inc_pc(1)?;
         let frame = access_macros::current_frame_mut!(thread);
-        let mut object = match frame.op_stack.pop() {
+        let object = match frame.op_stack.pop() {
             Some(o) => o.as_reference()?,
             None => return Err(Error::StackUnderflow(Opcode::MONITOREXIT)),
         };
         match object {
             Reference::Null => return Err(Error::NullPointerException(Opcode::MONITOREXIT)),
-            Reference::Array(_, mrc) | Reference::Interface(_, mrc) | Reference::Object(_, mrc) => {
+            Reference::Array(_, mut mrc) | Reference::Interface(_, mut mrc) | Reference::Object(_, mut mrc) => {
                 let m = match Rc::get_mut(&mut mrc) {
                     Some(m) => m,
                     None => return Err(Error::DoubleMutableReferenceToMonitor(Opcode::MONITORENTER)),

@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::rc::Rc;
 use std::result::Result;
 use std::collections::HashMap;
@@ -21,12 +22,13 @@ where
     instance_vars: HashMap<NameAndType, Value<dyn Class, dyn Object>>,
 }
 
-impl<C: Class + ?Sized> Object for CustomObject<C> {
+impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
     fn new(current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> {
         // First, resolve the reference to this class.
-        let class_info = current_method_class.get_class_file().cp_entry(class_index)?;
+        let cm_class_file = current_method_class.get_class_file();
+        let class_info = cm_class_file.cp_entry(class_index)?;
         let name_index = *class_info.as_class()?;
-        let name = current_method_class.get_class_file().cp_entry(name_index)?.as_utf8()?;
+        let name = cm_class_file.cp_entry(name_index)?.as_utf8()?;
         fn resolve_class_fields<'c ,'d, 'e>(inner_name: &str, jvm: &mut JVM, map: &mut HashMap<NameAndType, Value<dyn Class, dyn Object>>) -> Result<(), Error> {
             // We clone the name here, meaning that the name technically could become different from the actual stored name.
             // We just have to be careful to not let this happen.
@@ -63,7 +65,7 @@ impl<C: Class + ?Sized> Object for CustomObject<C> {
         }))
     }
     fn new_with_name(name: &str, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> {
-        // Now, we resolve the instance variables of the class.
+        // W resolve the instance variables of the class.
         // This resolution is recursive, because for each class we also have to resolve the fields of its superclasses.
         // To do this, we use this helper function.
         // This function has to use mutable references instead of return values because HashMap has no append function.
@@ -83,13 +85,14 @@ impl<C: Class + ?Sized> Object for CustomObject<C> {
                 resolve_class_fields(name.unwrap().as_str(), jvm, map)?;
             }
             let current_class = jvm.resolve_class_reference(inner_name)?;
+            let current_class_file = current_class.get_class_file();
             for field in current_class.get_class_file().fields().clone() {
                 let new_val = {                    
-                    let desc = current_class.get_class_file().cp_entry(field.descriptor_index)?.as_utf8()?;
+                    let desc = current_class_file.cp_entry(field.descriptor_index)?.as_utf8()?;
                     Value::new(desc.as_str())
                 };
-                let name = current_class.get_class_file().cp_entry(field.name_index)?.as_utf8()?.clone();
-                let descriptor = current_class.get_class_file().cp_entry(field.descriptor_index)?.as_utf8()?.clone();
+                let name = current_class_file.cp_entry(field.name_index)?.as_utf8()?.clone();
+                let descriptor = current_class_file.cp_entry(field.descriptor_index)?.as_utf8()?.clone();
                 let name_and_type = NameAndType {
                     name,
                     descriptor,
@@ -107,16 +110,17 @@ impl<C: Class + ?Sized> Object for CustomObject<C> {
         }))
     }
     fn get_field(&self, current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {
-        let field_ref = current_method_class.get_class_file().cp_entry(class_index)?.as_field_ref()?;
+        let cm_class_file = current_method_class.get_class_file();
+        let field_ref = cm_class_file.cp_entry(class_index)?.as_field_ref()?;
         // This code is for verifing that the class the field is for is the same as this class. 
-        let class_ref = *current_method_class.get_class_file().cp_entry(field_ref.class_index)?.as_class()?;
-        let class_name = current_method_class.get_class_file().cp_entry(class_ref)?.as_utf8()?;
-        if Rc::ptr_eq(&self.class.as_dyn_rc(), &jvm.resolve_class_reference(class_name)?) {
+        let class_ref = *cm_class_file.cp_entry(field_ref.class_index)?.as_class()?;
+        let class_name = cm_class_file.cp_entry(class_ref)?.as_utf8()?;
+        if Rc::ptr_eq(&Rc::clone(&self.class).as_dyn_rc(), &jvm.resolve_class_reference(class_name)?) {
             return Err(Error::IncompatibleObjectAndField(String::from(self.class.get_class_file().name()), String::from(class_name)));
         }
-        let name_and_type_info = current_method_class.get_class_file().cp_entry(field_ref.name_and_type_index)?.as_name_and_type()?;
-        let name = current_method_class.get_class_file().cp_entry(name_and_type_info.name_index)?.as_utf8()?.clone();
-        let descriptor = current_method_class.get_class_file().cp_entry(name_and_type_info.descriptor_index)?.as_utf8()?.clone();
+        let name_and_type_info = cm_class_file.cp_entry(field_ref.name_and_type_index)?.as_name_and_type()?;
+        let name = cm_class_file.cp_entry(name_and_type_info.name_index)?.as_utf8()?.clone();
+        let descriptor = cm_class_file.cp_entry(name_and_type_info.descriptor_index)?.as_utf8()?.clone();
         let name_and_type = NameAndType {
             name,
             descriptor,
@@ -133,14 +137,15 @@ impl<C: Class + ?Sized> Object for CustomObject<C> {
         }
     }
     fn put_field(&mut self, current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM, value: Value<dyn Class, dyn Object>) -> Result<(), Error> {
-        let field_ref = current_method_class.get_class_file().cp_entry(class_index)?.as_field_ref()?;
+        let cm_class_file = current_method_class.get_class_file();
+        let field_ref = cm_class_file.cp_entry(class_index)?.as_field_ref()?;
         // This code is for verifing that the class the field is for is the same as this class. 
-        let class_ref = *current_method_class.get_class_file().cp_entry(field_ref.class_index)?.as_class()?;
-        let class_name = current_method_class.get_class_file().cp_entry(class_ref)?.as_utf8()?;
-        if Rc::ptr_eq(&self.class.as_dyn_rc(), &jvm.resolve_class_reference(class_name)?) {
+        let class_ref = *cm_class_file.cp_entry(field_ref.class_index)?.as_class()?;
+        let class_name = cm_class_file.cp_entry(class_ref)?.as_utf8()?;
+        if Rc::ptr_eq(&Rc::clone(&self.class).as_dyn_rc(), &jvm.resolve_class_reference(class_name)?) {
             return Err(Error::IncompatibleObjectAndField(String::from(self.class.get_class_file().name()), String::from(class_name)));
         }
-        let name_and_type_info = current_method_class.get_class_file().cp_entry(field_ref.name_and_type_index)?.as_name_and_type()?;
+        let name_and_type_info = cm_class_file.cp_entry(field_ref.name_and_type_index)?.as_name_and_type()?;
         let name = current_method_class.get_class_file().cp_entry(name_and_type_info.name_index)?.as_utf8()?.clone();
         let descriptor = current_method_class.get_class_file().cp_entry(name_and_type_info.descriptor_index)?.as_utf8()?.clone();
         let name_and_type = NameAndType {
@@ -158,7 +163,7 @@ impl<C: Class + ?Sized> Object for CustomObject<C> {
     fn class(&self) -> Rc<dyn Class> {
        Rc::clone(&self.class).as_dyn_rc() 
     }
-    fn as_any(&self) -> &dyn std::any::Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
     fn into_any_rc(self: Rc<Self>) -> Rc<dyn Object> {

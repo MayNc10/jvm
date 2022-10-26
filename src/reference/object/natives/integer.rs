@@ -21,8 +21,9 @@ impl Object for Integer {
         Err(Error::NoSuchFieldError(Opcode::PUTFIELD))
     }
     fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
-        let name = current_method_class.get_class_file().cp_entry(method.name_index)?.as_utf8()?;
-        let desc = current_method_class.get_class_file().cp_entry(method.descriptor_index)?.as_utf8()?;
+        let cm_class_file = current_method_class.get_class_file();
+        let name = cm_class_file.cp_entry(method.name_index)?.as_utf8()?;
+        let desc = cm_class_file.cp_entry(method.descriptor_index)?.as_utf8()?;
         let thread = access_macros::current_thread_mut!(jvm);
         let frame: &mut Frame = access_macros::current_frame_mut!(thread);
         let mut was_natively_executed = true;

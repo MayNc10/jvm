@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{constant_pool::{NameAndType, Entry}, value::Value, errorcodes::Opcode, flags, reference::{self, Reference}};
+use crate::{constant_pool::{NameAndType, Entry}, value::{Value, VarValue}, errorcodes::Opcode, flags, reference::{self, Reference, array::Array, Monitor}, access_macros, frame::Frame};
 
 use super::*;
 
@@ -11,7 +11,7 @@ pub struct CustomClass {
 
 impl Class for CustomClass {
     // We could use a different type than NameAndType for the &Strings, but this is simpler and terribly slow.
-    fn new(file: classfile::ClassFile) -> Result<Self, Error> where Self : Sized {
+    fn new(file: classfile::ClassFile, jvm: &mut JVM) -> Result<Self, Error> where Self : Sized {
         let mut static_fields = HashMap::new();
         // Fill in static fields.
         for field in &file.fields {
@@ -141,8 +141,155 @@ impl Class for CustomClass {
         }
         
     }
-    fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
-        Err(Error::Todo(Opcode::MethodInvoke))
+    fn exec_method(self: Rc<Self>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
+        let thread = access_macros::current_thread_mut!(jvm);
+        let mut new_frame = Frame::new(self.clone(), method.clone());
+        // Fill out the local variables.
+        let c_file = self.get_class_file();
+        let mut descriptor: &str = c_file.cp_entry(method.descriptor_index)?.as_utf8()?;
+        descriptor = &descriptor[0..descriptor.find(")").unwrap()]; // Skip past the return value
+        descriptor = &descriptor[1..]; // Skip the beginning parenthesis.
+        let locals = &mut new_frame.local_variables;
+        while descriptor.len() > 0 {
+            let mut index = descriptor.len() - 1;
+            if &descriptor[index..] == ";" {
+                index = descriptor.rfind('L').unwrap();
+            }
+            if (index > 0) && &descriptor[index - 1..index] == "[" {
+                // There is a better way of doing this, FIXME.
+                descriptor = &descriptor[..index];
+                index -= 1;
+            }
+            match &descriptor[index..index + 1] {
+                "B" => {
+                    let current_frame = access_macros::current_frame_mut!(thread);
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_int(val)?;
+                    locals.push(VarValue::Byte(inner_value));
+                    descriptor = &descriptor[..index];
+                },
+                "C" => {
+                    let current_frame = access_macros::current_frame_mut!(thread);
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_int(val)?;
+                    locals.push(VarValue::Char(inner_value));
+                    descriptor = &descriptor[..index];
+                },
+                "D" => {
+                    let current_frame = access_macros::current_frame_mut!(thread);
+                    locals.push(VarValue::DoubleHighBytes);
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_double(val)?;
+                    locals.push(VarValue::Double(inner_value));
+                    descriptor = &descriptor[..index];
+                },
+                "F" => {
+                    let current_frame = access_macros::current_frame_mut!(thread);
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_float(val)?;
+                    locals.push(VarValue::Float(inner_value));
+                    descriptor = &descriptor[..index];
+                },
+                "I" => {
+                    let current_frame = access_macros::current_frame_mut!(thread);
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_int(val)?;
+                    locals.push(VarValue::Int(inner_value));
+                    descriptor = &descriptor[..index];
+                    
+                },
+                "J" => {
+                    let current_frame = access_macros::current_frame_mut!(thread);
+                    locals.push(VarValue::LongHighBytes);
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_long(val)?;
+                    locals.push(VarValue::Long(inner_value));
+                    descriptor = &descriptor[..index];
+                },
+                "S" => {
+                    let current_frame = access_macros::current_frame_mut!(thread);
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_int(val)?;
+                    locals.push(VarValue::Short(inner_value));
+                    descriptor = &descriptor[..index];
+                },
+                "Z" => {
+                    let current_frame = access_macros::current_frame_mut!(thread);
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_int(val)?;
+                    locals.push(VarValue::Byte(inner_value & 1));
+                    descriptor = &descriptor[..index];
+                },
+                "L" => {
+                    let current_frame = access_macros::current_frame_mut!(thread);
+                    // We could check the class type and make sure it matches up with the expected type, but that's not required by the JVM Spec, so for now we won't
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_reference(val)?;
+                    locals.push(VarValue::Reference(inner_value));
+                    descriptor = &descriptor[..index];
+                },
+                "[" => {
+                    let val = {
+                        // If this code is the method "main", then we have to add the args manually
+                        if thread.m_stack.len() > 0 {
+                            let current_frame = access_macros::current_frame_mut!(thread);
+                        // We could check the class type and make sure it matches up with the expected type, but that's not required by the JVM Spec, so for now we won't
+                            match current_frame.op_stack.pop() {
+                                Some(v) => v,
+                                None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                            }
+                        }
+                        else {
+                            if self.get_class_file().name() != jvm.m_main_class_name {
+                                panic!();
+                            }
+                            else {
+                                // TODO: Add actual arguments.
+                                let args = Array::new_ref(0, String::from("Ljava/lang/String;"));
+                                let args_ref = Reference::Array(Rc::new(args), Rc::new(Monitor::new()));
+                                Value::Reference(args_ref)
+                            }
+                        }
+                    };
+                    let inner_value = Value::to_reference(val)?;
+                    locals.push(VarValue::Reference(inner_value));
+                    descriptor = &descriptor[..index];
+                }
+                _ => return Err(Error::IllegalDescriptor),
+            }
+        }
+        locals.reverse(); // We have to push the variables in reverse order, so we correct it after.
+        
+        thread.push_frame(new_frame);
+        println!("Invoking {}{} in class {}", self.get_class_file().cp_entry(method.name_index)?.as_utf8()?, descriptor, self.get_class_file().name());
+        Ok(false)
     }
     fn get_class_file(&self) -> Rc<ClassFile> {
         self.class_file.clone()

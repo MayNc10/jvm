@@ -143,7 +143,23 @@ impl MethodInfo {
         };
         Ok(&descriptor[return_start..])
     }
-
+    pub fn num_args(&self, current_class: &Rc<ClassFile>) -> Result<usize, Error> {
+        let mut desc = current_class.cp_entry(self.descriptor_index)?.as_utf8()?.as_str();
+        desc = &desc[0..desc.rfind(")").unwrap()];
+        desc = &desc[1..desc.len()];
+        let mut num = 0;
+        while desc.len() > 0 {
+            num += 1;
+            let base = if &desc[0..1] == "L" {
+                desc.find(";").unwrap() + 1
+            }
+            else {
+                1
+            };
+            desc = &desc[base..desc.len()];
+        }
+        Ok(num)
+    }
 
 }
 

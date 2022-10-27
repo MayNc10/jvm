@@ -1,3 +1,4 @@
+use crate::class::classfile::ClassFile;
 use crate::reference::array::Array;
 use crate::{access_macros, class};
 use crate::attributes::code::Exception;
@@ -18,6 +19,7 @@ use std::option::Option;
 use std::rc::Rc;
 use std::result::Result;
 use std::string::String;
+use std::time::Instant;
 use std::vec::Vec;
 
 // Just useful for code readability
@@ -41,8 +43,9 @@ pub struct JVM {
     pub m_thread_index: usize,
     m_step_size: usize,
     m_has_halted: bool,
-    m_main_class_name: String,
+    pub m_main_class_name: String,
     m_flags: u8,
+    pub start_time: Instant,
 }
 
 // TODO: Rework every dump function to use traits?
@@ -62,6 +65,7 @@ impl JVM {
             m_has_halted: false,
             m_main_class_name: n,
             m_flags: flags,
+            start_time: Instant::now(),
         }
     }
     pub fn new_with_step_size(n: String, step_size: usize, flags: u8) -> JVM {
@@ -77,12 +81,14 @@ impl JVM {
             m_has_halted: false,
             m_main_class_name: n,
             m_flags: flags,
+            start_time: Instant::now(),
         }
     }
-    pub fn new_with_main_class(c: Rc<dyn Class>, flags: u8) -> Result<JVM, Error> {
-        let mut jvm = Self::new_jvm(String::from(c.get_class_file().name()), flags);
-        let name = String::from(c.get_class_file().name());
-        jvm.m_loaded_classes.insert(name, c);
+    pub fn new_with_main_class(c: ClassFile, flags: u8) -> Result<JVM, Error> {
+        let mut jvm = Self::new_jvm(String::from(c.name()), flags);
+        let name = String::from(c.name());
+        let class = class::new_class(c, &mut jvm)?;
+        jvm.m_loaded_classes.insert(name, class);
         // After adding the class, we initialize the class
         // We should use this error instead of ignoring it.
         let mut found_clinit = true;
@@ -101,7 +107,7 @@ impl JVM {
         }
         Ok(jvm)
     }
-    pub fn load_class_file(&mut self, path: &str) -> Result<(), Error> {
+    pub fn load_class_file(&mut self, path: &str) -> Result<(), Error> {    
         let mut resolved_path = String::from(path);
         if &path[0..4] == "java" {
             //TODO: Add java class path
@@ -124,7 +130,7 @@ impl JVM {
         let c = unsafe {
             let mut buf_bytes = std::slice::from_raw_parts_mut(buffer.as_ptr() as *mut u8, buffer.len() * std::mem::size_of::<u64>());
             f.read(&mut buf_bytes).unwrap();
-            class::new_class(class::classfile::ClassFile::new(&buf_bytes)?)?
+            class::new_class(class::classfile::ClassFile::new(&buf_bytes)?, self)?
         };
         // Adding the class to the map here seems a bit weird, but if we don't we overflow the stack.
         self.m_loaded_classes.insert(String::from(c.get_class_file().name()), Rc::clone(&c)); 
@@ -138,14 +144,6 @@ impl JVM {
         }
         if found_clinit {
             self.run_until_method_exit();
-        }
-        // This is really hacky, but apparently sometimes we have to add special support to jdk classes.
-        if &path[0..4] == "java" {
-            if path == "java/lang/System" {
-                // After loading the system class, we have to call initPhase1() on it
-                self.setup_method_call_from_name("initPhase1", "()V", c , true)?;
-                self.run_until_method_exit();
-            }
         }
         Ok(())
     }
@@ -180,7 +178,7 @@ impl JVM {
                                   crash_reason: String::from(reason), 
                                   base_traceback: String::from(base_traceback)};       
     }
-    #[inline] fn has_encoutered_error(&self) -> bool {
+    fn has_encoutered_error(&self) -> bool {
         // Used for checking whether to stop execution. 
         (self.m_thrown_error != Error::None) || self.m_crash_info.has_crashed   
     }
@@ -251,6 +249,8 @@ impl JVM {
                         for operand in frame.op_stack.iter().rev() {
                             println!("  {:#?}", operand);
                         }
+                        println!("Current pc: {}", frame.pc);
+                        //println!("Current code: {}", frame.current_method.code.as_ref().unwrap());
                     }
                 }
                 return;
@@ -1009,6 +1009,25 @@ impl JVM {
             },
             _ => Err(Error::UnsatisfiedLinkError(Opcode::MethodInvoke, mname.clone()))
         }    
+    }
+    pub fn execute_on_object(&mut self, method: &MethodInfo, current_class: Rc<dyn Class>) -> Result<(), Error> {
+        let num_args = method.num_args(&current_class.get_class_file())?;
+        let thread = current_thread_mut!(self); let frame = current_frame_mut!(thread);
+        let mut obj_ref = frame.op_stack[frame.op_stack.len() - num_args - 1].as_reference()?;
+        let mut obj_ref = Rc::clone(obj_ref.as_object_mut().unwrap());
+        let obj = unsafe { Rc::get_mut_unchecked(&mut obj_ref)};
+        obj.exec_method(Rc::clone(&current_class), self, method)?;
+        // Get rid of remaining object ref
+        let thread = current_thread_mut!(self); let frame = current_frame_mut!(thread);
+        if method.returns_void(&current_class.get_class_file())? {
+            frame.op_stack.pop();
+        }
+        else {
+            let ret_val = frame.op_stack.pop().unwrap();
+            frame.op_stack.pop();
+            frame.op_stack.push(ret_val);
+        }
+        Ok(())
     }
 }
 

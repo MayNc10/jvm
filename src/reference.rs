@@ -77,7 +77,7 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Clone for Reference<C, O> {
 
 // Should we make a wrapper for Array::new_multi?
 
-impl  Reference<dyn Class, dyn Object> {
+impl Reference<dyn Class, dyn Object> {
     pub fn new() -> Reference<dyn Class, dyn Object> {
         Reference::Null
     }
@@ -91,7 +91,7 @@ impl  Reference<dyn Class, dyn Object> {
         Reference::Interface(c, Rc::new(Monitor::new()))
     }
     pub fn new_object(current_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Reference<dyn Class, dyn Object>, Error> {
-        Ok(Reference::Object(CustomObject::<dyn Class>::new(current_class, class_index, jvm)?, Rc::new(Monitor::new())))
+        Ok(Reference::Object(CustomObject::<dyn Class>::new(Some(current_class), Some(class_index), jvm)?, Rc::new(Monitor::new())))
     }
 
     // Again, the runtime hit hurts, but we need to test while the design is still unstable, and I can't think of a better solution. 
@@ -136,6 +136,33 @@ impl  Reference<dyn Class, dyn Object> {
                 Rc::ptr_eq(o, o1) && Rc::ptr_eq(m, m1),
                 _ => false,
             },
+        }
+    }
+
+    pub fn as_object(&self) -> Option<&Rc<dyn Object>> {
+        if let Reference::Object(o, _) = self {
+            Some(o)
+        }
+        else {
+            None
+        }
+    }
+
+    pub fn as_object_mut(&mut self) -> Option<&mut Rc<dyn Object>> {
+        if let Reference::Object(o, _) = self {
+            Some(o)
+        }
+        else {
+            None
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        if let Reference::Null = self {
+            true
+        }
+        else {
+            false
         }
     }
     

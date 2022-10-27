@@ -7,7 +7,7 @@ use crate::constant_pool::{Entry, ReferenceKind};
 use crate::errorcodes::{Error, Opcode};
 use crate::reference::{Reference, Monitor, object};
 use crate::reference::array::Array;
-use crate::reference::object::Object;
+use crate::reference::object::{Object, natives};
 use crate::value::{Value, VarValue};
 
 use super::JVM;
@@ -182,25 +182,10 @@ impl JVM {
                 let current_class = Rc::clone(&frame.rt_const_pool);
                 let current_class_file = current_class.get_class_file();
                 let s_raw = current_class_file.cp_entry(*s)?.as_utf8()?; 
-                let s_obj = object::new_object("java/lang/String", self)?;
-                let string_class = Rc::clone(&s_obj.class());
-                let s_ref = Reference::Object(s_obj.clone(), Rc::new(Monitor::new()));             
-                let carray = Array::Char(s_raw.encode_utf16().collect());
-                let carray_len = carray.len();
-                let carray = Rc::new(carray);
-                let carray_asref = Reference::Array(carray.clone(), Rc::new(Monitor::new()));
-                let thread = access_macros::current_thread_mut!(self);
-                let frame = access_macros::current_frame_mut!(thread);
-                frame.op_stack.push(Value::Reference(s_ref.clone()));
-                frame.op_stack.push(Value::Reference(s_ref)); // duplicate the value, so we still have one afterwards.
-                frame.op_stack.push(Value::Reference(carray_asref));
-                frame.op_stack.push(Value::Int(0));
-                frame.op_stack.push(Value::Int(carray_len as i32));
-                self.setup_method_call_from_name("<init>", "([CII)V", Rc::clone(&string_class) , false)?;
-                self.run_until_method_exit();
-                // Lastly, we have to call .intern() on it.
-                // String <init> calls this already, so I don't think we have to call it.
-                //self.execute_native_from_name("intern", "()Ljava/lang/String;", string_class)?;
+                let s = natives::string::String::new_from_str(s_raw.as_str(), self)?.into_any_rc();
+                let s_ref = Reference::<dyn Class, dyn Object>::Object(s, Rc::new(Monitor::new()));
+                let thread = access_macros::current_thread_mut!(self); let frame = access_macros::current_frame_mut!(thread);
+                frame.op_stack.push(Value::Reference(s_ref));
             },
             Entry::Class(c) => {
                 // The spec says we have to return a reference to the class or interface itself. 
@@ -3249,6 +3234,7 @@ impl JVM {
         Ok(())
     }
     pub fn invokevirtual(&mut self) -> Result<(), Error> {
+        // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-6.html#jvms-6.5.invokevirtual
         let thread = access_macros::current_thread_mut!(self);
         let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
@@ -3268,15 +3254,6 @@ impl JVM {
         let c_file = c.get_class_file();
         let thread = access_macros::current_thread_mut!(self);
         let frame = access_macros::current_frame_mut!(thread);
-        let object_val = match frame.op_stack.pop() {
-            Some(o) => o,
-            None => return Err(Error::StackUnderflow(Opcode::INVOKEVIRTUAL)),
-        };
-        let object_ref = object_val.as_reference()?;
-        let object = match object_ref {
-            Reference::Object(o, _) => o,
-            _ => return Err(Error::IncorrectReferenceType(Opcode::INVOKEVIRTUAL)), 
-        };
         let mut method_to_call = None; 
         // Resolve method
         {
@@ -3307,7 +3284,9 @@ impl JVM {
                 return Err(Error::NoSuchMethodError(Opcode::MethodInvoke));
             }
         }
+        
         let mut resolved_method = method_to_call.unwrap();
+        /*
         {
             // search the methods of the object to see if we can override. 
             if (resolved_method.access_flags.flags & flags::method::ACC_PRIVATE) == 0 {
@@ -3341,6 +3320,7 @@ impl JVM {
                 // TODO: Search Superinterfaces of c.
             }
         };
+        */
         if (resolved_method.access_flags.flags & flags::method::ACC_STATIC) > 0 {
             return Err(Error::IncompatibleClassChangeError(Opcode::INVOKEVIRTUAL));
         } 
@@ -3350,10 +3330,7 @@ impl JVM {
         if (resolved_method.access_flags.flags & flags::method::ACC_SYNCHRONIZED) > 0 {
             // TODO: Enter monitors on Classes.
         } 
-        if (resolved_method.access_flags.flags & flags::method::ACC_NATIVE) > 0 {
-            return self.execute_native(&resolved_method, c);
-        } 
-        self.setup_method_call(&resolved_method, c, true)
+        self.execute_on_object(&resolved_method, c)
     }
     pub fn invokespecial(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
@@ -3514,11 +3491,8 @@ impl JVM {
                 },
             }
         } 
-        if (actual_method.access_flags.flags & flags::method::ACC_NATIVE) > 0 {
-            return self.execute_native(&actual_method, actual_class);
-        } 
         // TODO: Refactor self.setup_method_call() to handle native methods and synchronized ones (and rename it).
-        self.setup_method_call(&actual_method, actual_class, false)
+        self.execute_on_object(&actual_method, c)
     }
     pub fn invokestatic(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
@@ -3593,11 +3567,9 @@ impl JVM {
         if (method.access_flags.flags & flags::method::ACC_SYNCHRONIZED) > 0 {
             // TODO: Enter monitors on Classes.
         } 
-        if (method.access_flags.flags & flags::method::ACC_NATIVE) > 0 {
-            return self.execute_native(&method, c);
-        } 
         println!("Invoking static method {}{} in class {}", name, descriptor, c_name);
-        self.setup_method_call(&method, c, true)
+        let was_native = c.exec_method(self, &method)?;
+        Ok(())
     }
     pub fn invokeinterface(&mut self) -> Result<(), Error> {
         Err(Error::Todo(Opcode::INVOKEINTERFACE))

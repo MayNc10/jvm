@@ -10,7 +10,7 @@ pub mod natives;
 
 pub trait Object {
     // Should create a new object, and init its fields with zeros.
-    fn new(current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self : Sized;
+    fn new(current_method_class: Option<Rc<dyn Class>>, class_index: Option<u16>, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self : Sized;
     // Needed for CustomObject, but this should never be called on a native object.
     fn new_with_name(name: &str, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self : Sized {
         match name {
@@ -33,6 +33,7 @@ pub trait Object {
 
 pub fn new_object(name: &str, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> {
     match name {
+        "java/lang/String" => natives::string::String::new(None, None, jvm),
         _ => customobject::CustomObject::<dyn Class>::new_with_name(name, jvm)
     }
 }

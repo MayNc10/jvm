@@ -23,10 +23,10 @@ where
 }
 
 impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
-    fn new(current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> {
+    fn new(current_method_class: Option<Rc<dyn Class>>, class_index: Option<u16>, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> {
         // First, resolve the reference to this class.
-        let cm_class_file = current_method_class.get_class_file();
-        let class_info = cm_class_file.cp_entry(class_index)?;
+        let cm_class_file = current_method_class.unwrap().get_class_file();
+        let class_info = cm_class_file.cp_entry(class_index.unwrap())?;
         let name_index = *class_info.as_class()?;
         let name = cm_class_file.cp_entry(name_index)?.as_utf8()?;
         fn resolve_class_fields<'c ,'d, 'e>(inner_name: &str, jvm: &mut JVM, map: &mut HashMap<NameAndType, Value<dyn Class, dyn Object>>) -> Result<(), Error> {
@@ -158,7 +158,7 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
         }
     }
     fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
-        todo!("exec method customclass")
+        Err(Error::Todo(Opcode::NativeMethod))
     }
     fn class(&self) -> Rc<dyn Class> {
        Rc::clone(&self.class).as_dyn_rc() 

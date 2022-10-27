@@ -213,6 +213,7 @@ pub enum Opcode {
     ExceptionHandle,
     MethodInvoke,
     NewObject,
+    NativeMethod,
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -8,7 +8,7 @@ pub struct String {
 }
 
 impl Object for String {
-    fn new(current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self: Sized {
+    fn new(current_method_class: Option<Rc<dyn Class>>, class_index: Option<u16>, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self: Sized {
         // Once we implement String class, we should use a hashmap and stuff here.
         Ok(Rc::new(String {s: std::string::String::from(""), 
         s_class: jvm.resolve_class_reference("java/lang/String")?}))
@@ -48,6 +48,7 @@ impl Object for String {
             },
             _ => {
                 // do funky stuff
+                eprintln!("Use of unimplented function: {}{}", name, desc);
                 was_natively_executed = false;
             }
         }
@@ -79,5 +80,8 @@ impl String {
     pub fn new_from_string(s: std::string::String, jvm: &mut JVM ) -> Result<Rc<String>, Error> {
         Ok(Rc::new(String {s, 
         s_class: jvm.resolve_class_reference("java/lang/String")?}))
-        }
+    }
+    pub fn backing_string(&self) -> &std::string::String {
+        &self.s
+    }
 }

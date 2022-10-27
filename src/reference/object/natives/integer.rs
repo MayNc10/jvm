@@ -8,7 +8,7 @@ struct Integer {
 } 
 
 impl Object for Integer {
-    fn new(current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self: Sized {
+    fn new(current_method_class: Option<Rc<dyn Class>>, class_index: Option<u16>, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self: Sized {
         Ok(Rc::new(Integer {i: 0, int_class: jvm.resolve_class_reference("java/lang/Integer")?}))
     }
     fn new_with_name(name: &str, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error>  where Self : Sized {

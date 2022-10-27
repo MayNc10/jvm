@@ -28,12 +28,11 @@ fn main() {
         }
     };
     let main_class_file = load_class(&mut result_args.file, &result_args.fpath);
-    let main_class = class::new_class(main_class_file).unwrap();
     if result_args.should_dump {
-        println!("Loaded Class: {}", main_class.get_class_file());
+        println!("Loaded Class: {}", main_class_file);
     }
     if result_args.should_run {
-        let jvm = JVM::new_with_main_class(main_class, result_args.flags).unwrap();
+        let jvm = JVM::new_with_main_class(main_class_file, result_args.flags).unwrap();
         println!("Starting Execution...");
         jvm.excecute();
         println!("Finished Execution");

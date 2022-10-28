@@ -1,3 +1,7 @@
 /target
 /classlibs
 /modules
+*.checkstyle
+*.classpath
+*.project
+*.java

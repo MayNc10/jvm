@@ -46,12 +46,11 @@ pub struct JVM {
     pub m_main_class_name: String,
     m_flags: u8,
     pub start_time: Instant,
+    class_path: Option<String>,
 }
 
-// TODO: Rework every dump function to use traits?
-
 impl JVM {
-    pub fn new_jvm(n: String, flags: u8) -> JVM {
+    pub fn new_jvm(n: String, flags: u8, class_path: Option<String>) -> JVM {
         JVM {
             m_threads: vec![Thread::new()
             ],
@@ -66,9 +65,10 @@ impl JVM {
             m_main_class_name: n,
             m_flags: flags,
             start_time: Instant::now(),
+            class_path,
         }
     }
-    pub fn new_with_step_size(n: String, step_size: usize, flags: u8) -> JVM {
+    pub fn new_with_step_size(n: String, step_size: usize, flags: u8, class_path: Option<String>) -> JVM {
         JVM {
             m_threads: Vec::new(),
             m_loaded_classes: HashMap::new(),
@@ -82,10 +82,11 @@ impl JVM {
             m_main_class_name: n,
             m_flags: flags,
             start_time: Instant::now(),
+            class_path,
         }
     }
-    pub fn new_with_main_class(c: ClassFile, flags: u8) -> Result<JVM, Error> {
-        let mut jvm = Self::new_jvm(String::from(c.name()), flags);
+    pub fn new_with_main_class(c: ClassFile, flags: u8, class_path: Option<String>) -> Result<JVM, Error> {
+        let mut jvm = Self::new_jvm(String::from(c.name()), flags, class_path);
         let name = String::from(c.name());
         let class = class::new_class(c, &mut jvm)?;
         jvm.m_loaded_classes.insert(name, class);
@@ -112,7 +113,10 @@ impl JVM {
         if &path[0..4] == "java" {
             //TODO: Add java class path
             // For now we just hardcode the directory, in the future we will have to change that
-            let mut temp_str = String::from("../classlibs/17/java.base/");
+            let mut temp_str = match self.class_path.as_ref() {
+                Some(s) => s.clone(),
+                None => String::from("./classlibs/17/java.base/"),
+            };
             temp_str.push_str(&resolved_path);
             resolved_path = temp_str;
         }
@@ -951,7 +955,6 @@ impl JVM {
         locals.reverse(); // We have to push the variables in reverse order, so we correct it after.
         
         thread.push_frame(new_frame);
-        println!("Invoking {}{} in class {}", c.get_class_file().cp_entry(method.name_index)?.as_utf8()?, descriptor, c.get_class_file().name());
         Ok(())
     }
     pub fn execute_native_from_name(&mut self, name: &str, descriptor: &str, mut current_class: Rc<dyn Class>) -> Result<(), Error> {

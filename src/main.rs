@@ -32,10 +32,8 @@ fn main() {
         println!("Loaded Class: {}", main_class_file);
     }
     if result_args.should_run {
-        let jvm = JVM::new_with_main_class(main_class_file, result_args.flags).unwrap();
-        println!("Starting Execution...");
+        let jvm = JVM::new_with_main_class(main_class_file, result_args.flags, result_args.classpath.clone()).unwrap();
         jvm.excecute();
-        println!("Finished Execution");
     }
 
 }

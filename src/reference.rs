@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 use self::object::customobject::CustomObject;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Monitor {
     pub owned_thread: usize,
     pub entry_count: usize,
@@ -56,7 +56,7 @@ impl Monitor {
 }
 
 // We might want to have all these types hold their own monitors.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Reference<C: Class + ?Sized, O: Object + ?Sized> {
     Null,
     Array(Rc<Array<C, O>>, Rc<Monitor>),

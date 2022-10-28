@@ -3118,8 +3118,6 @@ impl JVM {
         let thread = access_macros::current_thread_mut!(self);
         {
             let frame = access_macros::current_frame_mut!(thread);
-            println!("Returning from function {}, in class {}", frame.rt_const_pool.get_class_file().cp_entry(frame.current_method.name_index)?.as_utf8()?,
-        frame.rt_const_pool.get_class_file().name());
             if !frame.current_method.returns_void(&frame.rt_const_pool.get_class_file())? {
                 return Err(Error::IncompatibleReturnType(Opcode::RETURN));
             }
@@ -3252,8 +3250,6 @@ impl JVM {
             (self.resolve_class_reference(c_name.clone().as_str())?, name, descriptor)
         };
         let c_file = c.get_class_file();
-        let thread = access_macros::current_thread_mut!(self);
-        let frame = access_macros::current_frame_mut!(thread);
         let mut method_to_call = None; 
         // Resolve method
         {
@@ -3285,7 +3281,7 @@ impl JVM {
             }
         }
         
-        let mut resolved_method = method_to_call.unwrap();
+        let resolved_method = method_to_call.unwrap();
         /*
         {
             // search the methods of the object to see if we can override. 

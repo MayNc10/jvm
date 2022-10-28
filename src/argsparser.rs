@@ -13,6 +13,7 @@ pub struct Cli {
     pub fpath: String,
     // args
     pub should_run: bool,
+    pub verbose: bool,
     pub should_dump: bool,
     pub classpath: Option<String>,
 
@@ -28,6 +29,7 @@ pub enum ParseError {
 pub fn parse_args(args: &[String]) -> Result<Cli, ParseError> {
     let mut should_run = false;
     let mut should_dump = false;
+    let mut verbose = false;
     let mut flags = 0;
     let mut fname = String::from("");
     let mut ftype = FileType::Class;
@@ -67,6 +69,12 @@ pub fn parse_args(args: &[String]) -> Result<Cli, ParseError> {
     }
     if args.contains(&String::from("--dump-backtrace")) {
         flags |= jvm::settings::SHOULD_BACKTRACE;
+    }
+    if args.contains(&String::from("-v")) {
+        verbose = true;
+    }
+    if args.contains(&String::from("--verbose")) {
+        verbose = true;
     }
     if let Some(sindex) = args.iter().position(|s| s == "-cp") {
         if args.len() == sindex + 1 {
@@ -116,6 +124,7 @@ pub fn parse_args(args: &[String]) -> Result<Cli, ParseError> {
         fpath: fname, // This should change to look in a specific class path
         should_run,
         should_dump,
+        verbose,
         classpath,
         flags,
     })

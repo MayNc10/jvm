@@ -14,7 +14,7 @@ use crate::class::Class;
 use crate::errorcodes::{Error, Opcode};
 use crate::value::Value;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RefArray<C: Class + ?Sized, O: Object + ?Sized> {
     pub arr: Vec<Reference<C, O>>,
     // This descriptor could be massively improved by making it a recursive enum. For now, this works.
@@ -30,7 +30,7 @@ impl PartialEq for RefArray<dyn Class, dyn Object> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Array<C: Class + ?Sized, O: Object + ?Sized> {
     Bool(Vec<bool>),
     Char(Vec<u16>),

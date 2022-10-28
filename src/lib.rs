@@ -2,6 +2,8 @@
 #![feature(map_try_insert)]
 // We use this feature to avoid updating field entry keys. 
 // We could also check beforehand, but this works simpler (even though it's experimental).
+#![feature(let_chains)] // We use this to chain let comparisons, which makes our code look cleaner
+
 
 #[macro_use] pub mod access_macros;
 pub mod argsparser;
@@ -16,3 +18,6 @@ pub mod attributes;
 pub mod constant_pool;
 pub mod flags;
 pub mod reference;
+
+#[cfg(test)]
+pub mod testing;

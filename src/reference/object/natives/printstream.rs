@@ -18,6 +18,14 @@ impl PrintStreamInner {
         }
         Ok(())
     } 
+    pub fn print(&self, s: &natives::string::String) -> Result<(), Error>{
+        match self {
+            PrintStreamInner::Stdout => print!("{}", s.backing_string()),
+            PrintStreamInner::Stderr => eprint!("{}", s.backing_string()),
+            PrintStreamInner::File(_f) => return Err(Error::Todo(Opcode::NativeMethod)),
+        }
+        Ok(())
+    } 
 }
 
 pub struct PrintStream {
@@ -52,8 +60,12 @@ impl Object for PrintStream {
             ("println", "(Ljava/lang/String;)V") => {
                 self.inner.println(frame.op_stack.pop().unwrap().as_reference()?.as_object().unwrap().as_any().downcast_ref::<natives::string::String>().unwrap())?;
             },
+            ("print", "(Ljava/lang/String;)V") => {
+                self.inner.print(frame.op_stack.pop().unwrap().as_reference()?.as_object().unwrap().as_any().downcast_ref::<natives::string::String>().unwrap())?;
+            }
             _ => {
                 // do funky stuff
+                eprintln!("Error: unrecognized function on printstream {}{}", name, desc);
                 was_natively_executed = false;
             }
         }

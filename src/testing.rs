@@ -111,7 +111,7 @@ mod ch02 {
         test_chapter("ch02", "MemoryDiagram")
     }
     #[test]
-    fn memory_diagramtimed() {
+    fn memory_diagram_timed() {
         test_chapter_timed("ch02", "MemoryDiagram")
     } 
     #[test]

@@ -10,7 +10,7 @@ enum PrintStreamInner {
 }
 
 impl PrintStreamInner {
-    pub fn println(&self, s: &natives::string::String) -> Result<(), Error>{
+    pub fn println(&self, s: &natives::string::String) -> Result<(), Error> {
         match self {
             PrintStreamInner::Stdout => println!("{}", s.backing_string()),
             PrintStreamInner::Stderr => eprintln!("{}", s.backing_string()),
@@ -18,7 +18,7 @@ impl PrintStreamInner {
         }
         Ok(())
     } 
-    pub fn print(&self, s: &natives::string::String) -> Result<(), Error>{
+    pub fn print(&self, s: &natives::string::String) -> Result<(), Error> {
         match self {
             PrintStreamInner::Stdout => print!("{}", s.backing_string()),
             PrintStreamInner::Stderr => eprint!("{}", s.backing_string()),
@@ -26,6 +26,41 @@ impl PrintStreamInner {
         }
         Ok(())
     } 
+    pub fn print_double(&self, d: &f64) -> Result<(), Error> {
+        let d = *d;
+        if d == d.round() {
+            match self {
+                PrintStreamInner::Stdout => print!("{:.1}", d),
+                PrintStreamInner::Stderr => eprint!("{:.1}", d),
+                PrintStreamInner::File(_f) => return Err(Error::Todo(Opcode::NativeMethod)),
+            }
+        }
+        else {
+            match self {
+                PrintStreamInner::Stdout => print!("{}", d),
+                PrintStreamInner::Stderr => eprint!("{}", d),
+                PrintStreamInner::File(_f) => return Err(Error::Todo(Opcode::NativeMethod)),
+            }
+        }
+        
+        Ok(())
+    } 
+    pub fn print_int(&self, i: &i32) -> Result<(), Error> {
+        match self {
+            PrintStreamInner::Stdout => print!("{}", i),
+            PrintStreamInner::Stderr => eprint!("{}", i),
+            PrintStreamInner::File(_f) => return Err(Error::Todo(Opcode::NativeMethod)),
+        }
+        Ok(())
+    } 
+    pub fn newline(&self) -> Result<(), Error> {
+        match self {
+            PrintStreamInner::Stdout => println!(),
+            PrintStreamInner::Stderr => eprintln!(),
+            PrintStreamInner::File(_f) => return Err(Error::Todo(Opcode::NativeMethod)),
+        }
+        Ok(())
+    }
 }
 
 pub struct PrintStream {
@@ -62,7 +97,21 @@ impl Object for PrintStream {
             },
             ("print", "(Ljava/lang/String;)V") => {
                 self.inner.print(frame.op_stack.pop().unwrap().as_reference()?.as_object().unwrap().as_any().downcast_ref::<natives::string::String>().unwrap())?;
-            }
+            },
+            ("print", "(D)V") => {
+                self.inner.print_double(frame.op_stack.pop().unwrap().as_double()?)?;
+            },
+            ("println", "(D)V") => {
+                self.inner.print_double(frame.op_stack.pop().unwrap().as_double()?)?;
+                self.inner.newline()?;
+            },
+            ("print", "(I)V") => {
+                self.inner.print_int(frame.op_stack.pop().unwrap().as_int()?)?;
+            },
+            ("println", "(I)V") => {
+                self.inner.print_int(frame.op_stack.pop().unwrap().as_int()?)?;
+                self.inner.newline()?;
+            },
             _ => {
                 // do funky stuff
                 eprintln!("Error: unrecognized function on printstream {}{}", name, desc);

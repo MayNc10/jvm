@@ -302,7 +302,7 @@ impl ClassFile {
                     (Entry::Integer(value), false)
                 },
                 4 => {
-                    let value = read_u32(data_ptr, &mut location) as f32;
+                    let value = f32::from_bits(read_u32(data_ptr, &mut location));
                     (Entry::Float(value), false)
                 },
                 5 => {
@@ -310,7 +310,7 @@ impl ClassFile {
                     (Entry::Long(value), true)
                 },
                 6 => {
-                    let value = read_u64(data_ptr, &mut location) as f64;
+                    let value = f64::from_bits(read_u64(data_ptr, &mut location));
                     (Entry::Double(value), true)
                 },
                 7 => {

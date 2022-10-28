@@ -42,6 +42,51 @@ pub fn test_chapter_timed(chap: &str, file: &str) {
     let time_after_jvm = Instant::now(); 
 
     assert_eq!(expected, actual);
+    println!("Us: {:#?}, them: {:#?}", time_after_jvm.duration_since(time_before_jvm), time_after_java.duration_since(time_before_java));
+    assert!(time_after_jvm.duration_since(time_before_jvm) < time_after_java.duration_since(time_before_java));
+}
+
+pub fn test_file(path: &str, file: &str) {
+    let mut s = String::from(".");
+    if let Ok(news) = std::env::var("JVM_FOLDER_PATH") {
+        s = news;
+    }
+
+    let path = format!("{}/{}", s, path);
+    let path = path.as_str();
+
+    let true_file = format!("{}/{}.class", path, file);
+    let true_file = true_file.as_str();
+
+    let expected = Command::new("java").arg("-cp").arg(path).arg(file).output().expect("Failed to run java file from cli");
+
+    let actual = Command::new("./target/release/rust-jvm").arg("-r").arg(true_file).output().expect("Failed to run jvm");
+    
+    assert_eq!(expected, actual);
+}
+
+pub fn test_file_timed(path: &str, file: &str) {
+    let mut s = String::from(".");
+    if let Ok(news) = std::env::var("JVM_FOLDER_PATH") {
+        s = news;
+    }
+
+    let path = format!("{}/{}", s, path);
+    let path = path.as_str();
+
+    let true_file = format!("{}/{}.class", path, file);
+    let true_file = true_file.as_str();
+
+    let time_before_java = Instant::now();
+    let expected = Command::new("java").arg("-cp").arg(path).arg(file).output().expect("Failed to run java file from cli");
+    let time_after_java = Instant::now(); 
+
+    let time_before_jvm = Instant::now();
+    let actual = Command::new("./target/release/rust-jvm").arg("-r").arg(true_file).output().expect("Failed to run jvm");
+    let time_after_jvm = Instant::now(); 
+
+    assert_eq!(expected, actual);
+    println!("Us: {:#?}, them: {:#?}", time_after_jvm.duration_since(time_before_jvm), time_after_java.duration_since(time_before_java));
     assert!(time_after_jvm.duration_since(time_before_jvm) < time_after_java.duration_since(time_before_java));
 }
 
@@ -130,4 +175,13 @@ mod ch02 {
     fn string_concat_timed() {
         test_chapter_timed("ch02", "StringConcat")
     } 
+}
+
+mod speed {
+    use super::*;
+
+    #[test]
+    fn factorial() {
+        test_file_timed("speed", "Factorial");
+    }
 }

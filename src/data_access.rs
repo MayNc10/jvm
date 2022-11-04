@@ -1,39 +1,41 @@
+use paste::paste;
+
+macro_rules! accessor {
+    ($num_type:ident, $width:expr, $nwidth:expr) => {    
+        paste! {     
+            /// # Safety
+            /// 
+            #[doc = "This function is unsafe because it requires that there are "]
+            #[doc = $nwidth ]
+            #[doc = "valid bytes at `data`"]
+            pub unsafe fn [< read_$num_type >](data: *const u8, loc: &mut isize) -> $num_type {
+                *loc += $width;
+                $num_type::from_be_bytes(std::slice::from_raw_parts(data.add((*loc - $width) as usize), $width).try_into().unwrap())
+            }
+        }
+    };
+}
+
+/// # Safety
+/// 
+/// This function is unsafe because it requires that there is a valid byte at `data`
 pub unsafe fn read_u8(data: *const u8, loc: &mut isize) -> u8 {
     *loc += 1;
-    u8::from_be(*data.offset(*loc - 1)) 
+    *data.add((*loc - 1) as usize)
 }
-pub unsafe fn read_u16(data: *const u8, loc: &mut isize) -> u16 {
-    *loc += 2; 
-    let new_data = data.offset(*loc - 2) as *const u16;
-    u16::from_be(new_data.read_unaligned()) 
-}
-pub unsafe fn read_u32(data: *const u8, loc: &mut isize) -> u32 {
-    *loc += 4;
-    let new_data = data.offset(*loc - 4) as *const u32;
-    u32::from_be(new_data.read_unaligned()) 
-}
-pub unsafe fn read_u64(data: *const u8, loc: &mut isize) -> u64 {
-    *loc += 8;
-    let new_data = data.offset(*loc - 8) as *const u64;
-    u64::from_be(new_data.read_unaligned()) 
-}
+
+accessor!(u16, 2, "2");
+accessor!(u32, 4, "4");
+accessor!(u64, 8, "8");
+
+/// # Safety
+/// 
+/// This function is unsafe because it requires that there is a valid byte at `data`
 pub unsafe fn read_i8(data: *const u8, loc: &mut isize) -> i8 {
     *loc += 1;
-    let new_data = data as *const i8;
-    i8::from_be(*new_data.offset(*loc - 1)) 
+    *data.add((*loc - 1) as usize) as i8
 }
-pub unsafe fn read_i16(data: *const u8, loc: &mut isize) -> i16 {
-    *loc += 2; 
-    let new_data = data.offset(*loc - 2) as *const i16;
-    i16::from_be(new_data.read_unaligned()) 
-}
-pub unsafe fn read_i32(data: *const u8, loc: &mut isize) -> i32 {
-    *loc += 4;
-    let new_data = data.offset(*loc - 4) as *const i32;
-    i32::from_be(new_data.read_unaligned()) 
-}
-pub unsafe fn read_i64(data: *const u8, loc: &mut isize) -> i64 {
-    *loc += 8;
-    let new_data = data.offset(*loc - 8) as *const i64;
-    i64::from_be(new_data.read_unaligned()) 
-}
+
+accessor!(i16, 2, "2");
+accessor!(i32, 4, "4");
+accessor!(i64, 8, "8");

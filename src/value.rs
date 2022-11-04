@@ -8,8 +8,6 @@
 // https://doc.rust-lang.org/nightly/alloc/borrow/enum.Cow.html
 use std::fmt;
 use std::result::Result;
-use std::rc::Rc;
-use std::str::EncodeUtf16;
 
 use crate::class::Class;
 use crate::errorcodes::Error;
@@ -61,26 +59,19 @@ impl PartialEq for Value<dyn Class, dyn Object> {
             },
         }
     }
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
-    }
-}
-
-impl<C: Class + ?Sized, O: Object + ?Sized> Value<C,O>  {
-    
 }
 
 impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Display for Value<C, O> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Byte(b) => write!(f, "Byte {}", b),
-            Value::Short(s) => write!(f, "Short {}", s),
-            Value::Int(i) => write!(f, "Int {}", i),
-            Value::Long(l) => write!(f, "Long {}", l),
-            Value::Char(c) => write!(f, "Char {}", c),
-            Value::Float(float) => write!(f, "Float {}", float),
-            Value::Double(d) => write!(f, "Double {}", d),
-            Value::ReturnAddress(addr) => write!(f, "ReturnAddress {}", addr),
+            Value::Byte(b) => write!(f, "Byte {b}"),
+            Value::Short(s) => write!(f, "Short {s}"),
+            Value::Int(i) => write!(f, "Int {i}"),
+            Value::Long(l) => write!(f, "Long {l}"),
+            Value::Char(c) => write!(f, "Char {c}"),
+            Value::Float(float) => write!(f, "Float {float}"),
+            Value::Double(d) => write!(f, "Double {d}"),
+            Value::ReturnAddress(addr) => write!(f, "ReturnAddress {addr}"),
             Value::Reference(r) => {
                 match r {
                     reference::Reference::Null => write!(f, "Null Reference"),
@@ -95,7 +86,7 @@ impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Display for Value<C, O> {
 
 impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Debug for Value<C, O> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 
@@ -197,40 +188,22 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Value<C, O> {
 
 impl<C: Class + ?Sized, O: Object + ?Sized> Value<C, O> {
     pub fn is_int(&self) -> bool {
-        match self {
-            Value::Byte(_) | Value::Short(_) | Value::Int(_) | Value::Char(_) => true,
-            _ => false, 
-        }
+        matches!(self, Value::Byte(_) | Value::Short(_) | Value::Int(_) | Value::Char(_))
     }
     pub fn is_long(&self) -> bool {
-        match self {
-            Value::Long(_) => true,
-            _ => false,
-        }
+        matches!(self, Value::Long(_))
     }
     pub fn is_float(&self) -> bool {
-        match self {
-            Value::Float(_) => true,
-            _ => false,
-        }
+        matches!(self, Value::Float(_))
     }
     pub fn is_double(&self) -> bool {
-        match self {
-            Value::Double(_) => true,
-            _ => false,
-        }
+        matches!(self, Value::Double(_))
     }
     pub fn is_retaddr(&self) -> bool {
-        match self {
-            Value::ReturnAddress(_) => true,
-            _ => false,
-        }
+        matches!(self, Value::ReturnAddress(_))
     }
     pub fn is_reference(&self) -> bool {
-        match self {
-            Value::Reference(_) => true,
-            _ => false,
-        }
+        matches!(self, Value::Reference(_))
     }
     pub fn to_int(self) -> Result<i32, Error> {
         match self {
@@ -408,16 +381,16 @@ impl<C: Class + ?Sized, O: Object + ?Sized> VarValue<C, O> {
 impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Display for VarValue<C, O> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            VarValue::Byte(b) => write!(f, "Byte {}", b),
-            VarValue::Short(s) => write!(f, "Short {}", s),
-            VarValue::Int(i) => write!(f, "Int {}", i),
-            VarValue::Long(l) => write!(f, "Long {}", l),
+            VarValue::Byte(b) => write!(f, "Byte {b}"),
+            VarValue::Short(s) => write!(f, "Short {s}"),
+            VarValue::Int(i) => write!(f, "Int {i}"),
+            VarValue::Long(l) => write!(f, "Long {l}"),
             VarValue::LongHighBytes => write!(f, "LongHighBytes"),
-            VarValue::Char(c) => write!(f, "Char {}", c),
-            VarValue::Float(float) => write!(f, "Float {}", float),
-            VarValue::Double(d) => write!(f, "Double {}", d),
+            VarValue::Char(c) => write!(f, "Char {c}"),
+            VarValue::Float(float) => write!(f, "Float {float}"),
+            VarValue::Double(d) => write!(f, "Double {d}"),
             VarValue::DoubleHighBytes => write!(f, "DoubleHighBytes"),
-            VarValue::ReturnAddress(addr) => write!(f, "ReturnAddress {}", addr),
+            VarValue::ReturnAddress(addr) => write!(f, "ReturnAddress {addr}"),
             VarValue::Reference(r) => {
                 match r {
                     reference::Reference::Null => write!(f, "Null Reference"),
@@ -433,7 +406,7 @@ impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Display for VarValue<C, O> {
 
 impl<C: Class + ?Sized, O: Object + ?Sized> fmt::Debug for VarValue<C, O> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 

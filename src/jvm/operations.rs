@@ -1,9 +1,7 @@
-use std::cell::Ref;
-use std::result::Result;
-use std::rc::Rc;
+use std::result::Result;use std::rc::Rc;
 
-use crate::class::{Class, self};
-use crate::constant_pool::{Entry, ReferenceKind};
+use crate::class::Class;
+use crate::constant_pool::Entry;
 use crate::errorcodes::{Error, Opcode};
 use crate::reference::{Reference, Monitor, object};
 use crate::reference::array::Array;
@@ -157,7 +155,7 @@ impl JVM {
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
 
-        let short = Value::Short((frame.current_method.code()?[pc] as i32) << 8 + 
+        let short = Value::Short(((frame.current_method.code()?[pc] as i32) << 8) + 
         frame.current_method.code()?[pc + 1] as i32);
         frame.op_stack.push(short);
         Ok(())
@@ -187,23 +185,23 @@ impl JVM {
                 let thread = access_macros::current_thread_mut!(self); let frame = access_macros::current_frame_mut!(thread);
                 frame.op_stack.push(Value::Reference(s_ref));
             },
-            Entry::Class(c) => {
+            Entry::Class(_c) => {
                 // The spec says we have to return a reference to the class or interface itself. 
                 // I think it means that we have to create a java.lang.Class object and return a reference.
                 // For the same reasons as string above, we are not implementing this right now.
                 return Err(Error::Todo(Opcode::LDC));
             },
             // For these next 2, see https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.5
-            Entry::MethodType(m) => {
+            Entry::MethodType(_m) => {
                 // This one is a reference to java.lang.invoke.MethodType.
                 // See above.
                 return Err(Error::Todo(Opcode::LDC));
             },
-            Entry::MethodHandle(m) => {
+            Entry::MethodHandle(_m) => {
                 // This one is incredibly complicated, but should result in a java.lang.invoke.MethodHandle.
                 return Err(Error::Todo(Opcode::LDC));
             },
-            Entry::Dynamic(dynamic) => {
+            Entry::Dynamic(_dynamic) => {
                 // This Dynamic cannot reference a field with discriptor Long or Double.
 
                 // For more information about the process see: https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.6
@@ -250,7 +248,7 @@ impl JVM {
         match entry {
             Entry::Integer(i) => frame.op_stack.push(Value::Int(*i)),
             Entry::Float(f) => frame.op_stack.push(Value::Float(*f)),
-            Entry::String(s) => {
+            Entry::String(_s) => {
                 // We have to resolve a reference to the internal java class string.
                 // The Java spec says that if we have already created an instance of String with the same base string, we cant just get a reference to it.
                 // We aren't going to do this right now, but we should implement it in the future.
@@ -259,23 +257,23 @@ impl JVM {
                 // (e.g. how do we create one from a constant string, how do we call .intern on it, ...)
                 return Err(Error::Todo(Opcode::LDCW));
             },
-            Entry::Class(c) => {
+            Entry::Class(_c) => {
                 // The spec says we have to return a reference to the class or interface itself. 
                 // I think it means that we have to create a java.lang.Class object and return a reference.
                 // For the same reasons as string above, we are not implementing this right now.
                 return Err(Error::Todo(Opcode::LDCW));
             },
             // For these next 2, see https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.5
-            Entry::MethodType(m) => {
+            Entry::MethodType(_m) => {
                 // This one is a reference to java.lang.invoke.MethodType.
                 // See above.
                 return Err(Error::Todo(Opcode::LDCW));
             },
-            Entry::MethodHandle(m) => {
+            Entry::MethodHandle(_m) => {
                 // This one is incredibly complicated, but should result in a java.lang.invoke.MethodHandle.
                 return Err(Error::Todo(Opcode::LDCW));
             },
-            Entry::Dynamic(dynamic) => {
+            Entry::Dynamic(_dynamic) => {
                 // This Dynamic cannot reference a field with discriptor Long or Double.
 
                 // For more information about the process see: https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.6
@@ -326,7 +324,7 @@ impl JVM {
             Entry::Long(l) => {
                 frame.op_stack.push(Value::Long(*l));
             },
-            Entry::Dynamic(dynamic) => {
+            Entry::Dynamic(_dynamic) => {
                 // like ldc_w dynamic, except it can only load references to longs or doubles
                 return Err(Error::Todo(Opcode::LDC2W));
             },
@@ -345,10 +343,10 @@ impl JVM {
         let frame = access_macros::current_frame_mut!(thread);
         let index = match wide {
             false => {
-                frame.current_method.code()?[pc] as u32
+                frame.current_method.code()?[pc] as u16
             },
             true => {
-                ((frame.current_method.code()?[pc] as u32) << 8) + frame.current_method.code()?[pc + 1] as u32
+                ((frame.current_method.code()?[pc] as u16) << 8) + frame.current_method.code()?[pc + 1] as u16
             },
         };
         let var = &frame.local_variables[index as usize];
@@ -600,7 +598,7 @@ impl JVM {
             Some(a) => a,
             None => return Err(Error::StackUnderflow(Opcode::IALOAD)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
+        let arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::IALOAD)),
@@ -624,7 +622,7 @@ impl JVM {
             Some(a) => a,
             None => return Err(Error::StackUnderflow(Opcode::LALOAD)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
+        let arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::LALOAD)),
@@ -648,7 +646,7 @@ impl JVM {
             Some(a) => a,
             None => return Err(Error::StackUnderflow(Opcode::FALOAD)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
+        let arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::FALOAD)),
@@ -672,7 +670,7 @@ impl JVM {
             Some(a) => a,
             None => return Err(Error::StackUnderflow(Opcode::DALOAD)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
+        let arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::DALOAD)),
@@ -696,7 +694,7 @@ impl JVM {
             Some(a) => a,
             None => return Err(Error::StackUnderflow(Opcode::AALOAD)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
+        let arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::AALOAD)),
@@ -720,7 +718,7 @@ impl JVM {
             Some(a) => a,
             None => return Err(Error::StackUnderflow(Opcode::BALOAD)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
+        let arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::BALOAD)),
@@ -744,7 +742,7 @@ impl JVM {
             Some(a) => a,
             None => return Err(Error::StackUnderflow(Opcode::CALOAD)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
+        let arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::CALOAD)),
@@ -768,7 +766,7 @@ impl JVM {
             Some(a) => a,
             None => return Err(Error::StackUnderflow(Opcode::SALOAD)),
         };
-        let mut arrayref_rc = arrayref.as_reference_mut()?;
+        let arrayref_rc = arrayref.as_reference_mut()?;
         let arr = match arrayref_rc {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::SALOAD)),
@@ -1243,11 +1241,11 @@ impl JVM {
         // FIXME: Store the array descriptor in the array type. 
         match val.as_reference()? {
             Reference::Null => (),
-            Reference::Array(a, _) => {
+            Reference::Array(_a, _) => {
             },
-            Reference::Interface(i, _) => {
+            Reference::Interface(_i, _) => {
             },
-            Reference::Object(o, _) => {
+            Reference::Object(_o, _) => {
             },           
         }
         unsafe {Rc::get_mut_unchecked(&mut array)}.set(*index.as_int()? as usize, val)?;
@@ -1277,7 +1275,7 @@ impl JVM {
             Reference::Array(arr, _) => arr,
             _ => return Err(Error::UnexpectedTypeOnStack(Opcode::BASTORE)),
         };
-        if !array.is_barray() {
+        if !array.is_barray() | !array.is_boolarray() {
             return Err(Error::IncorrectReferenceType(Opcode::BASTORE));
         }
         unsafe {Rc::get_mut_unchecked(&mut array)}.set(*index.as_int()? as usize, val)?;
@@ -1561,25 +1559,23 @@ impl JVM {
 
             }
         }   
+        else if val2.is_comptype1() {
+            let val3 = match frame.op_stack.pop() {
+                Some(v) => v,
+                None => return Err(Error::StackUnderflow(Opcode::DUP2X2)),
+            };
+            if val3.is_comptype2() {
+                return Err(Error::IncorrectComputationalType(Opcode::DUP2X2));
+            }
+            frame.op_stack.push(val.clone());
+            frame.op_stack.push(val3);
+            frame.op_stack.push(val2);
+            frame.op_stack.push(val);
+            }
         else {
-            if val2.is_comptype1() {
-                let val3 = match frame.op_stack.pop() {
-                    Some(v) => v,
-                    None => return Err(Error::StackUnderflow(Opcode::DUP2X2)),
-                };
-                if val3.is_comptype2() {
-                    return Err(Error::IncorrectComputationalType(Opcode::DUP2X2));
-                }
-                frame.op_stack.push(val.clone());
-                frame.op_stack.push(val3);
-                frame.op_stack.push(val2);
-                frame.op_stack.push(val);
-            }
-            else {
-                frame.op_stack.push(val.clone());
-                frame.op_stack.push(val2);
-                frame.op_stack.push(val); 
-            }
+            frame.op_stack.push(val.clone());
+            frame.op_stack.push(val2);
+            frame.op_stack.push(val); 
         }
         Ok(())
     }
@@ -2392,10 +2388,10 @@ impl JVM {
             None => return Err(Error::StackUnderflow(Opcode::LCMP)),
         };
         let result = match val1.as_long()? > val2.as_long()? {
-            true => 1 as i32,
+            true => 1_i32,
             false => match val1.as_long()? < val2.as_long()? {
-                true => -1 as i32,
-                false => 0 as i32,
+                true => -1_i32,
+                false => 0_i32,
             }
         };
         frame.op_stack.push(Value::Int(result));
@@ -2416,10 +2412,10 @@ impl JVM {
         // Because this is a float comparison, we have to deal with NaNs.
         // in this function, we group them together with the < case and return -1.
         let result = match val1.as_float()? > val2.as_float()? {
-            true => 1 as i32,
+            true => 1_i32,
             false => match val1.as_float()? == val2.as_float()? {
-                true => 0 as i32,
-                false => -1 as i32,
+                true => 0_i32,
+                false => -1_i32,
             }
         };
         frame.op_stack.push(Value::Int(result));
@@ -2440,10 +2436,10 @@ impl JVM {
         // Because this is a float comparison, we have to deal with NaNs.
         // in this function, we group them together with the > case and return 1.
         let result = match val1.as_float()? < val2.as_float()? {
-            true => -1 as i32,
+            true => -1_i32,
             false => match val1.as_float()? == val2.as_float()? {
-                true => 0 as i32,
-                false => 1 as i32,
+                true => 0_i32,
+                false => 1_i32,
             }
         };
         frame.op_stack.push(Value::Int(result));
@@ -2464,10 +2460,10 @@ impl JVM {
         // Because this is a double comparison, we have to deal with NaNs.
         // in this function, we group them together with the < case and return -1.
         let result = match val1.as_double()? > val2.as_double()? {
-            true => 1 as i32,
+            true => 1_i32,
             false => match val1.as_double()? == val2.as_double()? {
-                true => 0 as i32,
-                false => -1 as i32,
+                true => 0_i32,
+                false => -1_i32,
             }
         };
         frame.op_stack.push(Value::Int(result));
@@ -2488,10 +2484,10 @@ impl JVM {
         // Because this is a double comparison, we have to deal with NaNs.
         // in this function, we group them together with the > case and return 1.
         let result = match val1.as_double()? < val2.as_double()? {
-            true => -1 as i32,
+            true => -1_i32,
             false => match val1.as_double()? == val2.as_double()? {
-                true => 0 as i32,
-                false => 1 as i32,
+                true => 0_i32,
+                false => 1_i32,
             }
         };
         frame.op_stack.push(Value::Int(result));
@@ -2934,16 +2930,14 @@ impl JVM {
                 'C' => Value::Char((ret_val as u16) as i32),
                 'I' => Value::Int(ret_val),
                 'S' => Value::Short((ret_val as i16) as i32),
-                'Z' => Value::Byte((ret_val == 0) as i32),
+                'Z' => Value::Byte((ret_val == 1) as i32),
                 _ => unreachable!(),
             }
         };
-        let _ = match thread.m_stack.pop() {
-            Some(_2) => _2,
+        match thread.m_stack.pop() {
+            Some(_) => (),
             None => return Err(Error::FrameStackUnderflow(Opcode::IRETURN)),
-        };
-        // This should sync up with method calls, but if we forget to not add the pc there, we will skip an opcode and corrupt the machine.
-        thread.inc_pc(1)?;
+        }
         let frame = access_macros::current_frame_mut!(thread);
         frame.op_stack.push(return_value);
         Ok(())
@@ -2960,12 +2954,10 @@ impl JVM {
                 None => return Err(Error::StackUnderflow(Opcode::LRETURN)),
             }          
         };
-        let _ = match thread.m_stack.pop() {
-            Some(_2) => _2,
+        match thread.m_stack.pop() {
+            Some(_) => (),
             None => return Err(Error::FrameStackUnderflow(Opcode::LRETURN)),
-        };
-        // This should sync up with method calls, but if we forget to not add the pc there, we will skip an opcode and corrupt the machine.
-        thread.inc_pc(1)?;
+        }
         let frame = access_macros::current_frame_mut!(thread);
         frame.op_stack.push(return_value);
         Ok(())
@@ -2982,12 +2974,10 @@ impl JVM {
                 None => return Err(Error::StackUnderflow(Opcode::FRETURN)),
             }          
         };
-        let _ = match thread.m_stack.pop() {
-            Some(_2) => _2,
+        match thread.m_stack.pop() {
+            Some(_) => (),
             None => return Err(Error::FrameStackUnderflow(Opcode::FRETURN)),
-        };
-        // This should sync up with method calls, but if we forget to not add the pc there, we will skip an opcode and corrupt the machine.
-        thread.inc_pc(1)?;
+        }
         let frame = access_macros::current_frame_mut!(thread);
         frame.op_stack.push(return_value);
         Ok(())
@@ -3004,12 +2994,10 @@ impl JVM {
                 None => return Err(Error::StackUnderflow(Opcode::DRETURN)),
             }          
         };
-        let _ = match thread.m_stack.pop() {
-            Some(_2) => _2,
+        match thread.m_stack.pop() {
+            Some(_) => (),
             None => return Err(Error::FrameStackUnderflow(Opcode::DRETURN)),
-        };
-        // This should sync up with method calls, but if we forget to not add the pc there, we will skip an opcode and corrupt the machine.
-        thread.inc_pc(1)?;
+        }
         let frame = access_macros::current_frame_mut!(thread);
         frame.op_stack.push(return_value);
         Ok(())
@@ -3046,7 +3034,7 @@ impl JVM {
                 // FIXME: ^   
                 match ret_ref {
                     Reference::Null => (),
-                    Reference::Array(a, _) => {
+                    Reference::Array(_a, _) => {
                         if !((ret_descriptor.as_bytes()[0] as char == '[') | (ret_descriptor == "java/Lang/Object")) {
                             return Err(Error::IncompatibleReturnType(Opcode::ARETURN));
                         }
@@ -3056,7 +3044,7 @@ impl JVM {
                         let mut current_class_file = current_class.get_class_file();
                         let mut found = false;
                         // These nested loops are rough, they should be tested and probably refactored.
-                        while current_class_file.has_super() && found == false {
+                        while current_class_file.has_super() && !found {
                             if current_class_file.name() == ret_descriptor {
                                 found = true;
                                 break;
@@ -3088,7 +3076,7 @@ impl JVM {
                         let mut current_interface = i.clone();
                         let mut found = false;
                         // These nested loops are rough, they should be tested and probably refactored.
-                        while current_interface.get_class_file().has_super() && found == false {
+                        while current_interface.get_class_file().has_super() && !found {
                             if current_interface.get_class_file().name() == ret_descriptor {
                                 found = true;
                                 break;
@@ -3104,12 +3092,10 @@ impl JVM {
             ret_val   
         };
         let thread = access_macros::current_thread_mut!(self);
-        let _ = match thread.m_stack.pop() {
-            Some(_2) => _2,
-            None => return Err(Error::FrameStackUnderflow(Opcode::DRETURN)),
-        };
-        // This should sync up with method calls, but if we forget to not add the pc there, we will skip an opcode and corrupt the machine.
-        thread.inc_pc(1)?;
+        match thread.m_stack.pop() {
+            Some(_) => (),
+            None => return Err(Error::FrameStackUnderflow(Opcode::ARETURN)),
+        }
         let frame = access_macros::current_frame_mut!(thread);
         frame.op_stack.push(return_value);
         Ok(())
@@ -3122,11 +3108,10 @@ impl JVM {
                 return Err(Error::IncompatibleReturnType(Opcode::RETURN));
             }
         }
-        let _ = match thread.m_stack.pop() {
-            Some(_2) => _2,
-            None => return Err(Error::FrameStackUnderflow(Opcode::RETURN)),
-        };
-        Ok(())
+        match thread.m_stack.pop() {
+            Some(_) => Ok(()),
+            None => Err(Error::FrameStackUnderflow(Opcode::RETURN)),
+        }     
     }
     // References
     pub fn getstatic(&mut self) -> Result<(), Error> {
@@ -3134,7 +3119,9 @@ impl JVM {
         let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
-        let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
+        let index = unsafe {
+            u16::from_be_bytes(std::slice::from_raw_parts(frame.current_method.code()?.as_ptr().add(pc), 2).try_into().unwrap()) 
+        };
         let current_class = Rc::clone(&frame.rt_const_pool);
         let current_class_file = current_class.get_class_file();
         let field = current_class_file.cp_entry(index)?.as_field_ref()?;
@@ -3144,16 +3131,8 @@ impl JVM {
         let name_and_type = current_class_file.cp_entry(field.name_and_type_index)?.as_name_and_type()?;
         let name = current_class_file.cp_entry(name_and_type.name_index)?.as_utf8()?;
         let descriptor = current_class_file.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
-        let field = class.get_static(name, &descriptor, self)?;
-        let new_value;
-        // If this value is a "copy" type, we make a new Value. Otherwise, we use the reference inside to make a new value.       
-        if field.is_reference() {
-            let inner_ref = field.as_reference().unwrap();
-            new_value = Value::Reference(inner_ref.clone());
-        }
-        else {
-            new_value = field.clone();
-        }
+        let field = class.get_static(name, descriptor, self)?;
+        let new_value = field.clone();
         let thread = access_macros::current_thread_mut!(self);
         let frame = access_macros::current_frame_mut!(thread);
         frame.op_stack.push(new_value);
@@ -3170,7 +3149,7 @@ impl JVM {
         let field = current_class_file.cp_entry(index)?.as_field_ref()?;
         let class_index = current_class_file.cp_entry(field.class_index)?.as_class()?;
         let class_name = current_class_file.cp_entry(*class_index)?.as_utf8()?;
-        let mut class = self.resolve_class_reference(&class_name)?;
+        let mut class = self.resolve_class_reference(class_name)?;
         let name_and_type = current_class_file.cp_entry(field.name_and_type_index)?.as_name_and_type()?;
         let name = current_class_file.cp_entry(name_and_type.name_index)?.as_utf8()?;
         let descriptor = current_class_file.cp_entry(name_and_type.descriptor_index)?.as_utf8()?;
@@ -3192,7 +3171,7 @@ impl JVM {
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
-        let mut object_ref = match frame.op_stack.pop() {
+        let object_ref = match frame.op_stack.pop() {
             Some(mut v) => v.as_reference_mut()?,
             None => return Err(Error::StackUnderflow(Opcode::GETFIELD)),
         };
@@ -3336,7 +3315,7 @@ impl JVM {
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16); 
         let rt_file = frame.rt_const_pool.get_class_file();
         let entry = rt_file.cp_entry(index)?;
-        let (method_ref, is_interface) = match entry {
+        let (method_ref, _) = match entry {
             Entry::MethodRef(refinfo) => (refinfo, false),
             Entry::InterfaceMethodRef(refinfo) => (refinfo, true),
             _ => return Err(Error::IllegalConstantLoad(Opcode::INVOKESTATIC)),
@@ -3384,7 +3363,7 @@ impl JVM {
                 return Err(Error::NoSuchMethodError(Opcode::MethodInvoke));
             }
         }
-        let mut resolved_method = resolved_method_wrapped.unwrap();
+        let resolved_method = resolved_method_wrapped.unwrap();
         let resolved_method_class = Rc::clone(&c); // Save the originating class of resolved_method so we can index it.
         let res_method_file = resolved_method_class.get_class_file();
         let resolved_name = res_method_file.cp_entry(resolved_method.name_index)?.as_utf8()?;
@@ -3409,7 +3388,7 @@ impl JVM {
         && ((c.get_class_file().access_flags().flags & flags::class::ACC_SUPER) > 0 ) {
             c = self.resolve_class_reference(c.get_class_file().super_name().unwrap())?;
         }
-        let mut actual_method_wrapped = Some(resolved_method.clone());
+        let mut actual_method_wrapped = Some(resolved_method);
         let mut actual_class = Rc::clone(&resolved_method_class);
         // Now, select *actual* method
         // All methods have to be instance methods. 
@@ -3471,7 +3450,8 @@ impl JVM {
             let current_thread_number = self.m_thread_index;
             let thread = access_macros::current_thread_mut!(self);
             let frame = access_macros::current_frame_mut!(thread);
-            let mut object = match frame.op_stack.pop() {
+            // FIXME: This code is completely wrong, and should be addressed in either execute_on_object or the object's method call function.
+            let object = match frame.op_stack.pop() {
                 Some(o) => o.as_reference()?,
                 None => return Err(Error::StackUnderflow(Opcode::INVOKESPECIAL)),
             };
@@ -3488,7 +3468,7 @@ impl JVM {
             }
         } 
         // TODO: Refactor self.setup_method_call() to handle native methods and synchronized ones (and rename it).
-        self.execute_on_object(&actual_method, c)
+        self.execute_on_object(&actual_method, actual_class)
     }
     pub fn invokestatic(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
@@ -3513,14 +3493,12 @@ impl JVM {
         let mut c = self.resolve_class_reference(c_name)?;
         let mut c_file = c.get_class_file();
         if is_interface {
-            if !((c.get_class_file().access_flags().flags & flags::class::ACC_INTERFACE) > 0) {
+            if (c.get_class_file().access_flags().flags & flags::class::ACC_INTERFACE) == 0 {
                 return Err(Error::IncompatibleMethodRefAndClass(Opcode::INVOKESTATIC));
             }
         }
-        else {
-            if (c.get_class_file().access_flags().flags & flags::class::ACC_INTERFACE) > 0 {
+        else if (c.get_class_file().access_flags().flags & flags::class::ACC_INTERFACE) > 0 {
                 return Err(Error::IncompatibleMethodRefAndClass(Opcode::INVOKESTATIC));
-            }
         }
         let mut method_to_call = None; 
         // Resolve method
@@ -3563,8 +3541,7 @@ impl JVM {
         if (method.access_flags.flags & flags::method::ACC_SYNCHRONIZED) > 0 {
             // TODO: Enter monitors on Classes.
         } 
-        println!("Invoking static method {}{} in class {}", name, descriptor, c_name);
-        let was_native = c.exec_method(self, &method)?;
+        let _was_native = c.exec_method(self, &method)?;
         Ok(())
     }
     pub fn invokeinterface(&mut self) -> Result<(), Error> {
@@ -3586,7 +3563,7 @@ impl JVM {
             None => return Err(Error::MissingBootstrapTable(Opcode::INVOKEDYNAMIC)),
         };
         let bootstrap_method = &bootstrap_methods[bootstrap_index as usize];
-        let method_handle = frame.rt_const_pool.get_class_file().cp_entry(bootstrap_method.bootstrap_method_ref)?.as_method_handle()?;
+        let _method_handle = frame.rt_const_pool.get_class_file().cp_entry(bootstrap_method.bootstrap_method_ref)?.as_method_handle()?;
         // Resolve though https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.6 and 
         // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.5, a reference to an instance of 
         // java.lang.invoke.CallSite.
@@ -3611,15 +3588,14 @@ impl JVM {
         Err(Error::Todo(Opcode::INVOKEDYNAMIC))
 
     }
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
         let pc = thread.pc() + 1;
         thread.inc_pc(3)?;
         let frame = access_macros::current_frame_mut!(thread);
         let index = (frame.current_method.code()?[pc] as u16) << 8 | (frame.current_method.code()?[pc + 1] as u16);
-        let current_class = frame.rt_const_pool.clone();
-        drop(frame);
-        drop(thread);
+        let current_class = frame.rt_const_pool.clone();      
         let objectref = Reference::new_object(current_class, index, self)?;
         let thread = access_macros::current_thread_mut!(self);
         let frame = access_macros::current_frame_mut!(thread);
@@ -3702,8 +3678,8 @@ impl JVM {
                 Value::Reference(r) => r.clone(),
                 _ => return Err(Error::UnexpectedTypeOnStack(Opcode::ATHROW)),
             };
-            drop(frame);
-            drop(thread);            
+            
+                        
             match objectref {
                 Reference::Array(_, _) | Reference::Interface(_, _) => return Err(Error::IncorrectReferenceType(Opcode::ATHROW)),
                 Reference::Null => {
@@ -3752,8 +3728,8 @@ impl JVM {
         let class_file = class.get_class_file();
         let class_reference = *class_file.cp_entry(index)?.as_class()?;
         let class_desc = class_file.cp_entry(class_reference)?.as_utf8()?.as_str();
-        drop(frame);
-        drop(thread);
+        
+        
         if self.check_class(object_desc, class_desc)? {
             return Ok(());
         }
@@ -3795,8 +3771,6 @@ impl JVM {
         let class_file = class.get_class_file();
         let class_reference = *class_file.cp_entry(index)?.as_class()?;
         let class_desc = class_file.cp_entry(class_reference)?.as_utf8()?.as_str();
-        drop(frame);
-        drop(thread);
         if self.check_class(object_desc, class_desc)? {
             let thread = access_macros::current_thread_mut!(self);
             let frame = access_macros::current_frame_mut!(thread);
@@ -3813,7 +3787,7 @@ impl JVM {
         let thread = access_macros::current_thread_mut!(self);
         thread.inc_pc(1)?;
         let frame = access_macros::current_frame_mut!(thread);
-        let mut object = match frame.op_stack.pop() {
+        let object = match frame.op_stack.pop() {
             Some(o) => o.as_reference()?,
             None => return Err(Error::StackUnderflow(Opcode::MONITORENTER)),
         };

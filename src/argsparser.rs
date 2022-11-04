@@ -88,7 +88,7 @@ pub fn parse_args(args: &[String]) -> Result<Cli, ParseError> {
         }
         classpath = Some(args[sindex + 1].clone());
     }
-    let mut missing_file = args.len() == 0;
+    let mut missing_file = args.is_empty();
     if !missing_file {
         fname = args.last().unwrap().clone();
         if classpath.is_some() {
@@ -102,14 +102,13 @@ pub fn parse_args(args: &[String]) -> Result<Cli, ParseError> {
                 missing_file = &fname[(fname.len() - 6)..] != ".class"
             }
         }
-        else {
-            if fname.len() <= 4 {
-                missing_file = true;
-            }
-            else {
-                missing_file = &fname[(fname.len() - 6)..] != ".jar"
-            }
+        else if fname.len() <= 4 {
+            missing_file = true;
         }
+        else {
+            missing_file = &fname[(fname.len() - 6)..] != ".jar"
+        }
+        
     }
     if missing_file {
         return Err(ParseError::MissingFileArgument);

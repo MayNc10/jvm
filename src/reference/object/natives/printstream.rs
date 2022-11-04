@@ -30,15 +30,15 @@ impl PrintStreamInner {
         let d = *d;
         if d == d.round() {
             match self {
-                PrintStreamInner::Stdout => print!("{:.1}", d),
-                PrintStreamInner::Stderr => eprint!("{:.1}", d),
+                PrintStreamInner::Stdout => print!("{d:.1}"),
+                PrintStreamInner::Stderr => eprint!("{d:.1}"),
                 PrintStreamInner::File(_f) => return Err(Error::Todo(Opcode::NativeMethod)),
             }
         }
         else {
             match self {
-                PrintStreamInner::Stdout => print!("{}", d),
-                PrintStreamInner::Stderr => eprint!("{}", d),
+                PrintStreamInner::Stdout => print!("{d}"),
+                PrintStreamInner::Stderr => eprint!("{d}"),
                 PrintStreamInner::File(_f) => return Err(Error::Todo(Opcode::NativeMethod)),
             }
         }
@@ -47,8 +47,8 @@ impl PrintStreamInner {
     } 
     pub fn print_int(&self, i: &i32) -> Result<(), Error> {
         match self {
-            PrintStreamInner::Stdout => print!("{}", i),
-            PrintStreamInner::Stderr => eprint!("{}", i),
+            PrintStreamInner::Stdout => print!("{i}"),
+            PrintStreamInner::Stderr => eprint!("{i}"),
             PrintStreamInner::File(_f) => return Err(Error::Todo(Opcode::NativeMethod)),
         }
         Ok(())
@@ -69,19 +69,19 @@ pub struct PrintStream {
 }
 
 impl Object for PrintStream {
-    fn new(current_method_class: Option<Rc<dyn Class>>, class_index: Option<u16>, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self : Sized {
+    fn new(_current_method_class: Option<Rc<dyn Class>>, _class_index: Option<u16>, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self : Sized {
         Ok(Rc::new(PrintStream {
             inner: PrintStreamInner::File(Reference::Null),
             class: jvm.resolve_class_reference("java/io/PrintStream")?,
         }))
     }
-    fn new_with_name(name: &str, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self : Sized {
+    fn new_with_name(_name: &str, _jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self : Sized {
         panic!("No one should ever call PrintStream::new_with_name")
     }
-    fn get_field(&self, current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {
+    fn get_field(&self, _current_method_class: Rc<dyn Class>, _class_index: u16, _jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {
         Err(Error::Todo(Opcode::NativeMethod))
     }
-    fn put_field(&mut self, current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM, value: Value<dyn Class, dyn Object>) -> Result<(), Error> {
+    fn put_field(&mut self, _current_method_class: Rc<dyn Class>, _class_index: u16, _jvm: &mut JVM, _value: Value<dyn Class, dyn Object>) -> Result<(), Error> {
         Err(Error::Todo(Opcode::NativeMethod))
     }
     fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
@@ -114,7 +114,7 @@ impl Object for PrintStream {
             },
             _ => {
                 // do funky stuff
-                eprintln!("Error: unrecognized function on printstream {}{}", name, desc);
+                eprintln!("Error: unrecognized function on printstream {name}{desc}");
                 was_natively_executed = false;
             }
         }

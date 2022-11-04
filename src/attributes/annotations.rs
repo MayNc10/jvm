@@ -7,6 +7,9 @@ pub struct Annotation {
 }
 
 impl Annotation {
+    /// # Safety
+    ///  
+    /// This function is unsafe because the caller has to guarantee that valid bytes exist at ```data```
     pub unsafe fn new(data: *const u8, location: &mut isize) -> Result<Annotation, Error> {
         let type_index = data_access::read_u16(data, location);
         let num_pairs = data_access::read_u16(data, location);
@@ -40,6 +43,9 @@ pub enum ElementValue {
 }
 
 impl ElementValue {
+    /// # Safety
+    ///  
+    /// This function is unsafe because the caller has to guarantee that valid bytes exist at ```data```
     pub unsafe fn new(data: *const u8, location: &mut isize) -> Result<ElementValue, Error> {
         let tag = data_access::read_u8(data, location);
         match tag as char {
@@ -91,8 +97,11 @@ pub struct TypeAnnotation {
 }
 
 impl TypeAnnotation {
+    /// # Safety
+    ///  
+    /// This function is unsafe because the caller has to guarantee that valid bytes exist at ```data```
     pub unsafe fn new(data: *const u8, location: &mut isize) -> Result<TypeAnnotation, Error> {
-        let target_type = data_access::read_u8(data, location);
+        let _target_type = data_access::read_u8(data, location);
         Err(Error::Todo(Opcode::AALOAD)) // Just a placeholder, TODO.
     }
 }

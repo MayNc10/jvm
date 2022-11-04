@@ -202,19 +202,19 @@ impl fmt::Display for Entry {
         match self {
             Entry::Utf8(s) => write!(f, "Entry::Utf8 {{
     length: {},
-    bytes: {},\n}}", s.len(), s),
+    bytes: {s},\n}}", s.len()),
             Entry::Integer(i) => write!(f, "Entry::Integer {{
-    bytes: {},\n}}", i),
+    bytes: {i},\n}}"),
             Entry::Float(float) => write!(f, "Entry::Float {{
-    bytes: {},\n}}", float),
+    bytes: {float},\n}}"),
             Entry::Long(l) => write!(f, "Entry::Long {{
-    bytes: {},\n}}", l),
+    bytes: {l},\n}}"),
             Entry::Double(d) => write!(f, "Entry::Double {{
-    bytes: {},\n}}", d),
+    bytes: {d},\n}}"),
             Entry::Class(c) => write!(f, "Entry::Class {{
-    name_index: {},\n}}", c),
+    name_index: {c},\n}}"),
             Entry::String(index) => write!(f, "Entry::String {{
-    string_index: {},\n}}", index),
+    string_index: {index},\n}}"),
             Entry::FieldRef(info) => write!(f, "Entry::FieldRef {{
     class_index: {},
     name_and_type_index: {},\n}}", info.class_index, info.name_and_type_index),
@@ -231,7 +231,7 @@ impl fmt::Display for Entry {
     reference_kind: {},
     reference_index: {},\n}}", handle.ref_kind, handle.ref_index),
             Entry::MethodType(t) => write!(f, "Entry::MethodType {{
-    descriptor_index: {},\n}}", t),
+    descriptor_index: {t},\n}}"),
             Entry::Dynamic(d) => write!(f, "Entry::Dynamic {{
     bootstrap_method_attr_index: {},
     name_and_type_index: {},\n}}", d.bootstrap_method_attr_index, d.name_and_type_index),
@@ -239,10 +239,10 @@ impl fmt::Display for Entry {
     bootstrap_method_attr_index: {},
     name_and_type_index: {},\n}}", d.bootstrap_method_attr_index, d.name_and_type_index),
             Entry::Module(m) => write!(f, "Entry::Module {{
-    name_index: {},\n}}", m),
+    name_index: {m},\n}}"),
             Entry::Package(p) => write!(f, "Entry::Package {{
-    name_index: {},\n}}", p),
-            Entry::Unusable => write!(f, "Entry::Unusable\n"),
+    name_index: {p},\n}}"),
+            Entry::Unusable => writeln!(f, "Entry::Unusable"),
         }
     }
 }

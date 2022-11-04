@@ -20,7 +20,10 @@ pub struct Thread {
     pub next_instruction_is_wide: bool,
 }
 impl Thread {
-    #[inline] pub fn clone_current_frame(&mut self) -> Frame {
+    pub fn new() -> Thread {
+        Thread {m_stack: Vec::new(), current_monitor: None, next_instruction_is_wide: false }
+    }
+    pub fn clone_current_frame(&mut self) -> Frame {
         self.current_frame().clone()
     }
     pub fn current_frame(&self) -> &Frame {
@@ -31,20 +34,20 @@ impl Thread {
         let length = self.m_stack.len();
         &mut self.m_stack[length -1]
     }
-    #[inline] pub fn pop_frame(&mut self) -> Option<Frame> {
+    pub fn pop_frame(&mut self) -> Option<Frame> {
         self.m_stack.pop()
     }
-    #[inline] pub fn replace_current_frame(&mut self, frame: Frame) {
+    pub fn replace_current_frame(&mut self, frame: Frame) {
         let length = self.m_stack.len();
         self.m_stack[length - 1] = frame;
     }
-    #[inline] pub fn push_frame(&mut self, frame: Frame) {
+    pub fn push_frame(&mut self, frame: Frame) {
         self.m_stack.push(frame);
     }
-    #[inline] pub fn pc(&self) -> usize {
+    pub fn pc(&self) -> usize {
         self.m_stack.last().unwrap().pc
     }
-    #[inline] pub fn set_pc(&mut self, new_pc: usize) -> Result<(), Error> {
+    pub fn set_pc(&mut self, new_pc: usize) -> Result<(), Error> {
         let max_pc = {
             self.current_frame().current_method.code()?.len()
         };
@@ -54,7 +57,7 @@ impl Thread {
         self.m_stack.last_mut().unwrap().pc = new_pc;
         Ok(())
     }
-    #[inline] pub fn inc_pc(&mut self, added_pc: isize) -> Result<(), Error> {
+    pub fn inc_pc(&mut self, added_pc: isize) -> Result<(), Error> {
         let max_pc = {
             self.current_frame().current_method.code()?.len() as isize
         };
@@ -64,23 +67,24 @@ impl Thread {
         self.m_stack.last_mut().unwrap().pc = (self.m_stack.last().unwrap().pc as isize + added_pc) as usize;
         Ok(())
     }
-    #[inline] pub fn push_op(&mut self, op:  Value<dyn Class, dyn Object>) {
+    pub fn push_op(&mut self, op:  Value<dyn Class, dyn Object>) {
         let length = self.m_stack.len();
         let op_len = self.m_stack[length - 1].op_stack.len();
         self.m_stack[length-1].op_stack[op_len-1] = op;
     } 
-    #[inline] pub fn pop_op(&mut self) -> Option<Value<dyn Class, dyn Object>> {
+    pub fn pop_op(&mut self) -> Option<Value<dyn Class, dyn Object>> {
         let length = self.m_stack.len();
         self.m_stack[length - 1].op_stack.pop()
     }
-    #[inline] pub fn push_var(&mut self, var: VarValue<dyn Class, dyn Object>) {
+    pub fn push_var(&mut self, var: VarValue<dyn Class, dyn Object>) {
         let length = self.m_stack.len();
         let var_len = self.m_stack[length - 1].local_variables.len();
         self.m_stack[length-1].local_variables[var_len-1] = var;
     }
 } 
-impl<'a> Thread {
-    pub fn new() -> Thread {
-        Thread {m_stack: Vec::new(), current_monitor: None, next_instruction_is_wide: false }
+
+impl Default for Thread {
+    fn default() -> Self {
+        Self::new()
     }
-}
+}  

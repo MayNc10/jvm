@@ -1,5 +1,3 @@
-use std::any::Any;
-use std::marker::PhantomData;
 use std::result::Result;
 use std::rc::Rc;
 
@@ -11,7 +9,7 @@ use super::{Reference, Monitor};
 // use super::packedboolarray::PackedBoolArray;
 
 use crate::class::Class;
-use crate::errorcodes::{Error, Opcode};
+use crate::errorcodes::Error;
 use crate::value::Value;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -23,10 +21,7 @@ pub struct RefArray<C: Class + ?Sized, O: Object + ?Sized> {
 
 impl PartialEq for RefArray<dyn Class, dyn Object> {
     fn eq(&self, other: &Self) -> bool {
-        self.arr == other.arr && self.descriptor == self.descriptor
-    }
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
+        self.arr == other.arr && self.descriptor == other.descriptor
     }
 }
 
@@ -70,67 +65,35 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Array<C, O> {
             atype::T_SHORT => Array::new_short(size),
             atype::T_INT => Array::new_int(size),
             atype::T_LONG => Array::new_long(size),
-            _ => panic!("Illegal value for atype in newarray: {}", atype),
+            _ => panic!("Illegal value for atype in newarray: {atype}"),
         }
     }
 
     // In order to make these type-safe, all the vectors must be initialized.
 
     pub fn new_bool(size: usize) -> Array<C, O> {
-        let mut v = Vec::with_capacity(size);
-        for _ in 0..size {
-            v.push(false);
-        }
-        Array::Bool(v)
+        Array::Bool(vec![false;size])
     }
     pub fn new_char(size: usize) -> Array<C, O> {
-        let mut v = Vec::with_capacity(size);
-        for _ in 0..size {
-            v.push(0);
-        }
-        Array::Char(v)
+        Array::Char(vec![0;size])
     }
     pub fn new_float(size: usize) -> Array<C, O> {
-        let mut v = Vec::with_capacity(size);
-        for _ in 0..size {
-            v.push(0.0);
-        }
-        Array::Float(v)
+        Array::Float(vec![0.0;size])
     }
     pub fn new_double(size: usize) -> Array<C, O> {
-        let mut v = Vec::with_capacity(size);
-        for _ in 0..size {
-            v.push(0.0);
-        }
-        Array::Double(v)
+        Array::Double(vec![0.0;size])
     }
     pub fn new_byte(size: usize) -> Array<C, O> {
-        let mut v = Vec::with_capacity(size);
-        for _ in 0..size {
-            v.push(0);
-        }
-        Array::Byte(v)
+        Array::Byte(vec![0;size])
     }
     pub fn new_short(size: usize) -> Array<C, O> {
-        let mut v = Vec::with_capacity(size);
-        for _ in 0..size {
-            v.push(0);
-        }
-        Array::Short(v)
+        Array::Short(vec![0;size])
     }
     pub fn new_int(size: usize) -> Array<C, O> {
-        let mut v = Vec::with_capacity(size);
-        for _ in 0..size {
-            v.push(0);
-        }
-        Array::Int(v)
+        Array::Int(vec![0;size])
     }
     pub fn new_long(size: usize) -> Array<C, O> {
-        let mut v = Vec::with_capacity(size);
-        for _ in 0..size {
-            v.push(0);
-        }
-        Array::Long(v)
+        Array::Long(vec![0;size])
     }
     pub fn new_ref(size: usize, descriptor: String) -> Array<C, O> {
         let mut v = Vec::with_capacity(size);
@@ -154,6 +117,9 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Array<C, O> {
             Array::Long(lvec) => lvec.len(),
             Array::Ref(refarray) => refarray.arr.len(),
         }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
 }
@@ -200,8 +166,8 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Array<C, O> {
         // First, verify descriptor makes sense.
         fn size_and_base(descriptor: &str, base_count: u8) -> (u8, char) {
             match descriptor.as_bytes()[0] as char {
-                '[' => return size_and_base(&descriptor[1..], base_count + 1),
-                _ => return (base_count, descriptor.as_bytes()[base_count as usize] as char ),
+                '[' => size_and_base(&descriptor[1..], base_count + 1),
+                _ => (base_count, descriptor.as_bytes()[base_count as usize] as char ),
             }
         }
         let (dimensionality, base_type_char) = size_and_base(&descriptor, 0);
@@ -297,8 +263,8 @@ impl<C: Class + ?Sized, O: Object + ?Sized> Array<C, O> {
                 Ok(())
             }
             Array::Ref(refarray) => {
-                let mut reference = val.as_reference()?;
-                refarray.arr[index] = reference.clone();
+                let reference = val.as_reference()?;
+                refarray.arr[index] = reference;
                 Ok(())
             }
 
@@ -382,9 +348,6 @@ macro_rules! partial_eq_array {
                     _ => false,
                 }
             }
-            fn ne(&self, other: &$T) -> bool {
-                !self.eq(other)
-            }
         }
     };
 }
@@ -413,9 +376,6 @@ impl PartialEq for Array<dyn Class, dyn Object> {
             Array::Int(v)=> other == v,
             Array::Ref(v)=> other == v,
         }
-    }
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
     }
 }
 

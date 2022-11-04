@@ -1,7 +1,7 @@
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use super::*;
-use crate::{errorcodes::Opcode, reference::{Reference, object::{self, natives}, Monitor, array::{Array, RefArray}}, access_macros};
+use crate::{errorcodes::Opcode, reference::{Reference, object::{self, natives}, Monitor, array::{Array, RefArray}}};
 
 pub struct System {
     pub instream: Reference<dyn Class, dyn Object>,
@@ -15,6 +15,7 @@ impl System {
     pub fn set_in(&mut self, obj_ref: Reference<dyn Class, dyn Object>) -> Result<(), Error> {
         if let Reference::Object(ref obj, _) = obj_ref {
             // Make sure the object class is preserved
+            #[allow(clippy::vtable_address_comparisons)]
             if !self.instream.is_null() && !Rc::ptr_eq(&self.instream.as_object().unwrap().class() , &obj.class()) {
                 Err(Error::IncompatibleClassChangeError(Opcode::NativeMethod))
             } 
@@ -34,6 +35,7 @@ impl System {
     pub fn set_out(&mut self, obj_ref: Reference<dyn Class, dyn Object>) -> Result<(), Error> {
         if let Reference::Object(ref obj, _) = obj_ref {
             // Make sure the object class is preserved
+            #[allow(clippy::vtable_address_comparisons)]
             if !self.outstream.is_null() && !Rc::ptr_eq(&self.outstream.as_object().unwrap().class() , &obj.class()) {
                 Err(Error::IncompatibleClassChangeError(Opcode::NativeMethod))
             } 
@@ -53,6 +55,7 @@ impl System {
     pub fn set_err(&mut self, obj_ref: Reference<dyn Class, dyn Object>) -> Result<(), Error> {
         if let Reference::Object(ref obj, _) = obj_ref {
             // Make sure the object class is preserved
+            #[allow(clippy::vtable_address_comparisons)]
             if !self.errstream.is_null() && !Rc::ptr_eq(&self.errstream.as_object().unwrap().class() , &obj.class()) {
                 Err(Error::IncompatibleClassChangeError(Opcode::NativeMethod))
             } 
@@ -72,6 +75,7 @@ impl System {
     fn set_console(&mut self, obj_ref: Reference<dyn Class, dyn Object>) -> Result<(), Error> {
         if let Reference::Object(ref obj, _) = obj_ref {
             // Make sure the object class is preserved
+            #[allow(clippy::vtable_address_comparisons)]
             if !self.console.is_null() && !Rc::ptr_eq(&self.console.as_object().unwrap().class() , &obj.class()) {
                 Err(Error::IncompatibleClassChangeError(Opcode::NativeMethod))
             } 
@@ -93,7 +97,7 @@ impl System {
         self.console.clone()
     }
     pub fn inherited_channel(&self) -> Reference<dyn Class, dyn Object> {Reference::Null}
-    pub fn set_security_manager(&mut self, jvm: &mut JVM, obj_ref: Reference<dyn Class, dyn Object>) -> Result<(), Error> {
+    pub fn set_security_manager(&mut self, jvm: &mut JVM, _obj_ref: Reference<dyn Class, dyn Object>) -> Result<(), Error> {
         // FIXME: Does this work?
         let e_obj = object::new_object("java/lang/UnsupportedOperationException", jvm)?;
         let e_ref = Reference::<dyn Class, dyn Object>::Object(e_obj, Rc::new(Monitor::new()));
@@ -173,8 +177,8 @@ impl Class for System {
             file: Rc::new(file),
         })
     }
-    fn get_static(&self, name: &String, _descriptor: &String, _jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {
-        match name.as_str() {
+    fn get_static(&self, name: &str, _descriptor: &str, _jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {
+        match name {
             "in" => Ok(Value::Reference(self.instream.clone())),
             "out" => Ok(Value::Reference(self.outstream.clone())),
             "err" => Ok(Value::Reference(self.errstream.clone())),
@@ -182,8 +186,8 @@ impl Class for System {
             _ => Err(Error::NoSuchFieldError(Opcode::NativeMethod)),
         }
     }
-    fn put_static(&mut self, name: &String, _descriptor: &String, value:  Value<dyn Class, dyn Object>, _jvm: &mut JVM) -> Result<(), Error> {
-        match name.as_str() {
+    fn put_static(&mut self, name: &str, _descriptor: &str, value:  Value<dyn Class, dyn Object>, _jvm: &mut JVM) -> Result<(), Error> {
+        match name {
             "in" => self.set_in(value.as_reference()?),
             "out" => self.set_out(value.as_reference()?),
             "err" => self.set_err(value.as_reference()?),
@@ -191,7 +195,7 @@ impl Class for System {
             _ => Err(Error::NoSuchFieldError(Opcode::NativeMethod)),
         }
     }
-    fn exec_method(self: Rc<Self>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
+    fn exec_method(self: Rc<Self>, _jvm: &mut JVM, _method: &MethodInfo) -> Result<bool, Error> {
         Err(Error::Todo(Opcode::NativeMethod))
     }
     fn get_class_file(&self) -> Rc<ClassFile> {

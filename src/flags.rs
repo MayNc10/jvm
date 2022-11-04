@@ -48,11 +48,11 @@ pub mod class {
             if (self.flags & ACC_MODULE) > 0 {
                 text.push_str(", ACC_MODULE");
             }
-            if text.len() > 0 {
+            if !text.is_empty() {
                 text.remove(0);
                 text.remove(0);
             }
-            write!(f, "{}", text)
+            write!(f, "{text}")
         }
     }
     impl BitAnd<u16> for AccessFlags {
@@ -112,11 +112,11 @@ pub mod field {
             if (self.flags & ACC_ENUM) > 0 {
                 text.push_str(", ACC_ENUM");
             }
-            if text.len() > 0 {
+            if !text.is_empty() {
                 text.remove(0);
                 text.remove(0);
             }
-            write!(f, "{}", text)
+            write!(f, "{text}")
         }
     }
     impl BitAnd<u16> for AccessFlags {
@@ -192,11 +192,11 @@ pub mod method {
             if (self.flags & ACC_SYNTHETIC) > 0 {
                 text.push_str(", ACC_SYNTHETIC");
             }
-            if text.len() > 0 {
+            if !text.is_empty() {
                 text.remove(0);
                 text.remove(0);
             }
-            write!(f, "{}", text)
+            write!(f, "{text}")
         }
     }
     impl BitAnd<u16> for AccessFlags {

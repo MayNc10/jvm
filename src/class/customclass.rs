@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{constant_pool::{NameAndType, Entry}, value::{Value, VarValue}, errorcodes::Opcode, flags, reference::{self, Reference, array::Array, Monitor}, access_macros, frame::Frame};
+use crate::{constant_pool::{NameAndType, Entry}, value::{Value, VarValue}, errorcodes::Opcode, flags, reference::{Reference, array::Array, Monitor}, access_macros, frame::Frame};
 
 use super::*;
 
@@ -11,7 +11,7 @@ pub struct CustomClass {
 
 impl Class for CustomClass {
     // We could use a different type than NameAndType for the &Strings, but this is simpler and terribly slow.
-    fn new(file: classfile::ClassFile, jvm: &mut JVM) -> Result<Self, Error> where Self : Sized {
+    fn new(file: classfile::ClassFile, _jvm: &mut JVM) -> Result<Self, Error> where Self : Sized {
         let mut static_fields = HashMap::new();
         // Fill in static fields.
         for field in &file.fields {
@@ -35,7 +35,7 @@ impl Class for CustomClass {
                             Entry::Float(f) => Value::Float(f),
                             Entry::Long(l) => Value::Long(l),
                             Entry::Double(d) => Value::Double(d),
-                            Entry::String(s_index) => {
+                            Entry::String(_s_index) => {
                                 // This should make a new instance of String, but for now we will just give a null ref.
                                 Value::Reference(Reference::Null)
                             },
@@ -63,7 +63,7 @@ impl Class for CustomClass {
         }
         Ok(CustomClass { class_file: Rc::new(file), static_fields })
     }
-    fn get_static(&self, name: &String, descriptor: &String, jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {
+    fn get_static(&self, name: &str, descriptor: &str, jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {
         let name_and_type = NameAndType { name: String::from(name), descriptor: String::from(descriptor) };
         if let Some(v) = self.static_fields.get(&name_and_type) {
             Ok((**v).clone())
@@ -122,7 +122,7 @@ impl Class for CustomClass {
         */
     }
     //https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-6.html#jvms-6.5.putstatic
-    fn put_static(&mut self, name: &String, descriptor: &String, value: Value<dyn Class, dyn Object>, jvm: &mut JVM) -> Result<(), Error> {
+    fn put_static(&mut self, name: &str, descriptor: &str, value: Value<dyn Class, dyn Object>, jvm: &mut JVM) -> Result<(), Error> {
         let name_and_type = NameAndType { name: String::from(name), descriptor: String::from(descriptor) };
         if let Some(v) = self.static_fields.get_mut(&name_and_type) {
             // FIXME: Check compatibility
@@ -147,10 +147,10 @@ impl Class for CustomClass {
         // Fill out the local variables.
         let c_file = self.get_class_file();
         let mut descriptor: &str = c_file.cp_entry(method.descriptor_index)?.as_utf8()?;
-        descriptor = &descriptor[0..descriptor.find(")").unwrap()]; // Skip past the return value
+        descriptor = &descriptor[0..descriptor.find(')').unwrap()]; // Skip past the return value
         descriptor = &descriptor[1..]; // Skip the beginning parenthesis.
         let locals = &mut new_frame.local_variables;
-        while descriptor.len() > 0 {
+        while !descriptor.is_empty() {
             let mut index = descriptor.len() - 1;
             if &descriptor[index..] == ";" {
                 index = descriptor.rfind('L').unwrap();
@@ -258,7 +258,7 @@ impl Class for CustomClass {
                 "[" => {
                     let val = {
                         // If this code is the method "main", then we have to add the args manually
-                        if thread.m_stack.len() > 0 {
+                        if !thread.m_stack.is_empty() {
                             let current_frame = access_macros::current_frame_mut!(thread);
                         // We could check the class type and make sure it matches up with the expected type, but that's not required by the JVM Spec, so for now we won't
                             match current_frame.op_stack.pop() {
@@ -266,16 +266,14 @@ impl Class for CustomClass {
                                 None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                             }
                         }
-                        else {
-                            if self.get_class_file().name() != jvm.m_main_class_name {
+                        else if self.get_class_file().name() != jvm.m_main_class_name {
                                 panic!();
                             }
-                            else {
-                                // TODO: Add actual arguments.
-                                let args = Array::new_ref(0, String::from("Ljava/lang/String;"));
-                                let args_ref = Reference::Array(Rc::new(args), Rc::new(Monitor::new()));
-                                Value::Reference(args_ref)
-                            }
+                        else {
+                            // TODO: Add actual arguments.
+                            let args = Array::new_ref(0, String::from("Ljava/lang/String;"));
+                            let args_ref = Reference::Array(Rc::new(args), Rc::new(Monitor::new()));
+                            Value::Reference(args_ref)
                         }
                     };
                     let inner_value = Value::to_reference(val)?;
@@ -285,10 +283,8 @@ impl Class for CustomClass {
                 _ => return Err(Error::IllegalDescriptor),
             }
         }
-        locals.reverse(); // We have to push the variables in reverse order, so we correct it after.
-        
+        locals.reverse(); // We have to push the variables in reverse order, so we correct it after.   
         thread.push_frame(new_frame);
-        println!("Invoking {}{} in class {}", self.get_class_file().cp_entry(method.name_index)?.as_utf8()?, descriptor, self.get_class_file().name());
         Ok(false)
     }
     fn get_class_file(&self) -> Rc<ClassFile> {

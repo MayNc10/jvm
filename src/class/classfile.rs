@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::vec::Vec;
 use std::option::Option;
 use std::rc::Rc;
@@ -10,13 +9,11 @@ use crate::attributes::code::stack_map_table::{StackMapFrame, VerificationTypeIn
 use crate::attributes::code::{Code, Exception, LineNumber, LocalVariable, LocalVariableType};
 use crate::attributes::module::{Module, Require, Export, Open, Provide};
 use crate::attributes::{InnerClass, EnclosingMethod, BootstrapMethod, RecordComponentInfo, MethodParameter};
-use crate::constant_pool::{Entry, NameAndTypeInfo, RefInfo, MethodHandleInfo, ReferenceKind, DynamicInfo, NameAndType};
-use crate::reference::Reference;
-use crate::{data_access::*, access_macros};
+use crate::constant_pool::{Entry, NameAndTypeInfo, RefInfo, MethodHandleInfo, ReferenceKind, DynamicInfo};
+use crate::data_access::*;
 use crate::errorcodes::{Error, Opcode};
 use crate::flags;
-use crate::jvm::JVM;
-use crate::value::Value;
+
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FieldInfo {
@@ -57,7 +54,7 @@ pub struct MethodInfo {
 }
 
 impl MethodInfo {
-    pub fn code<'a>(&'a self) -> Result<&'a Vec<u8>, Error> {
+    pub fn code(& self) -> Result<&Vec<u8>, Error> {
         if let Some(code) = &self.code {
             return Ok(&code.code);
         }
@@ -82,10 +79,7 @@ impl MethodInfo {
             Some(loc) => loc + 1,
             None => return Err(Error::IncompleteMethodDescriptor(Opcode::IRETURN)),
         };
-        Ok(match descriptor.as_bytes()[return_start] as char{
-            'B' | 'C' | 'I' | 'S' | 'Z' => true,
-            _ => false, 
-        }) 
+        Ok(matches!(descriptor.as_bytes()[return_start], b'B' | b'C' | b'I' | b'S' | b'Z')) 
     }
     pub fn return_char(&self, current_class: &Rc<ClassFile>) -> Result<char, Error>{
         let descriptor = current_class.cp_entry(self.descriptor_index)?.as_utf8()?;
@@ -101,7 +95,7 @@ impl MethodInfo {
             Some(loc) => loc + 1,
             None => return Err(Error::IncompleteMethodDescriptor(Opcode::LRETURN)),
         };
-        Ok(descriptor.as_bytes()[return_start] == 'J' as u8) 
+        Ok(descriptor.as_bytes()[return_start] == b'J') 
     }
     pub fn returns_float(&self, current_class: &Rc<ClassFile>) -> Result<bool, Error> {
         let descriptor = current_class.cp_entry(self.descriptor_index)?.as_utf8()?;
@@ -109,7 +103,7 @@ impl MethodInfo {
             Some(loc) => loc + 1,
             None => return Err(Error::IncompleteMethodDescriptor(Opcode::FRETURN)),
         };
-        Ok(descriptor.as_bytes()[return_start] == 'F' as u8) 
+        Ok(descriptor.as_bytes()[return_start] == b'F') 
     }
     pub fn returns_double(&self, current_class: &Rc<ClassFile>) -> Result<bool, Error> {
         let descriptor = current_class.cp_entry(self.descriptor_index)?.as_utf8()?;
@@ -117,7 +111,7 @@ impl MethodInfo {
             Some(loc) => loc + 1,
             None => return Err(Error::IncompleteMethodDescriptor(Opcode::DRETURN)),
         };
-        Ok(descriptor.as_bytes()[return_start] == 'D' as u8) 
+        Ok(descriptor.as_bytes()[return_start] == b'D') 
     }
     pub fn returns_reference(&self, current_class: &Rc<ClassFile>) -> Result<bool, Error> {
         let descriptor = current_class.cp_entry(self.descriptor_index)?.as_utf8()?;
@@ -125,7 +119,7 @@ impl MethodInfo {
             Some(loc) => loc + 1,
             None => return Err(Error::IncompleteMethodDescriptor(Opcode::ARETURN)),
         };
-        Ok((descriptor.as_bytes()[return_start] == 'L' as u8) | (descriptor.as_bytes()[return_start] == '[' as u8)) 
+        Ok((descriptor.as_bytes()[return_start] == b'L') | (descriptor.as_bytes()[return_start] == b'[')) 
     }
     pub fn returns_void(&self, current_class: &Rc<ClassFile>) -> Result<bool, Error> {
         let descriptor = current_class.cp_entry(self.descriptor_index)?.as_utf8()?;
@@ -133,7 +127,7 @@ impl MethodInfo {
             Some(loc) => loc + 1,
             None => return Err(Error::IncompleteMethodDescriptor(Opcode::RETURN)),
         };
-        Ok(descriptor.as_bytes()[return_start] == 'V' as u8) 
+        Ok(descriptor.as_bytes()[return_start] == b'V') 
     }
     pub fn return_descriptor<'a>(&self, current_class: &'a Rc< ClassFile>) -> Result<&'a str, Error> {
         let descriptor = (*current_class).cp_entry(self.descriptor_index)?.as_utf8()?;
@@ -145,13 +139,13 @@ impl MethodInfo {
     }
     pub fn num_args(&self, current_class: &Rc<ClassFile>) -> Result<usize, Error> {
         let mut desc = current_class.cp_entry(self.descriptor_index)?.as_utf8()?.as_str();
-        desc = &desc[0..desc.rfind(")").unwrap()];
+        desc = &desc[0..desc.rfind(')').unwrap()];
         desc = &desc[1..desc.len()];
         let mut num = 0;
-        while desc.len() > 0 {
+        while !desc.is_empty() {
             num += 1;
             let base = if &desc[0..1] == "L" {
-                desc.find(";").unwrap() + 1
+                desc.find(';').unwrap() + 1
             }
             else {
                 1
@@ -210,10 +204,7 @@ impl ClassFile {
         &self.methods
     }
     pub fn cp_entry(&self, index: u16) -> Result<&Entry, Error> {
-        if index == 0 {
-            return Err(Error::IllegalConstantPoolIndex);
-        }
-        else if index > self.constant_pool.len() as u16 {
+        if index == 0 || index > self.constant_pool.len() as u16{
             return Err(Error::IllegalConstantPoolIndex);
         }
         Ok(&self.constant_pool[(index - 1) as usize])
@@ -244,13 +235,13 @@ impl ClassFile {
     }
     pub fn name(&self) -> &str {
         // This code doesn't test the value of the option, and just uses unwrap, because cases like constant pool corruption should be tested in verify_state().
-        &((self.cp_entry(*self.cp_entry(self.this_class_index).unwrap().as_class().unwrap())).unwrap().as_utf8().unwrap())
+        (self.cp_entry(*self.cp_entry(self.this_class_index).unwrap().as_class().unwrap())).unwrap().as_utf8().unwrap()
         
     }
     pub fn super_name(&self) -> Option<&str> {
         // This code doesn't test the value of the option, and just uses unwrap, because cases like constant pool corruption should be tested in verify_state()
         if self.super_class_index != 0 {
-            return Some(&((self.cp_entry(*self.cp_entry(self.super_class_index).unwrap().as_class().unwrap())).unwrap().as_utf8().unwrap()));
+            return Some((self.cp_entry(*self.cp_entry(self.super_class_index).unwrap().as_class().unwrap())).unwrap().as_utf8().unwrap());
         }
         None
     }
@@ -262,8 +253,19 @@ impl ClassFile {
     }
 }
 
+macro_rules! illegal_duplicate {
+    ($attrib:ident) => {
+        if $attrib.is_some() {
+            return Err(Error::IllegalDuplicateAttribute);
+        }
+    };
+}
+
 impl ClassFile {
     // TODO: This function should use ptr.add() instead of ptr.offset().
+    /// # Safety
+    /// 
+    /// This function is unsafe because the caller has to guarantee that `data` is aligned as a `&[u64]`
     pub unsafe fn new(data: &[u8]) -> Result< ClassFile, Error> {
         // This function uses unsafe raw pointers because it makes the casting easier. 
         // This is something we should do for all functions at some point.
@@ -420,25 +422,19 @@ impl ClassFile {
                 let length = read_u32(data_ptr, &mut location);
                 match name {
                     "ConstantValue" => {
-                        if let Some(_) = constant_value {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(constant_value);
                         let index = read_u16(data_ptr, &mut location);
                         constant_value = Some(index);
                     },
                     "Synthetic" => synthetic = true,
                     "Deprecated" => deprecated = true,
                     "Signature" => {
-                        if let Some(_) = signature {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(signature);
                         let index = read_u16(data_ptr, &mut location);
                         signature = Some(index);
                     },
                     "RuntimeVisibleAnnotations" => {
-                        if let Some(_) = rt_vis_annotations {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(rt_vis_annotations);
                         let num_annotations = read_u16(data_ptr, &mut location);
                         let mut annotations = Vec::with_capacity(num_annotations as usize);
                         while annotations.capacity() > annotations.len() {
@@ -447,9 +443,7 @@ impl ClassFile {
                         rt_vis_annotations = Some(annotations);
                     },
                     "RuntimeInvisibleAnnotations" => {
-                        if let Some(_) = rt_invis_annotations {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(rt_invis_annotations);
                         let num_annotations = read_u16(data_ptr, &mut location);
                         let mut annotations = Vec::with_capacity(num_annotations as usize);
                         while annotations.capacity() > annotations.len() {
@@ -458,9 +452,7 @@ impl ClassFile {
                         rt_invis_annotations = Some(annotations);
                     },
                     "RuntimeVisibleTypeAnnotations" => {
-                        if let Some(_) = rt_vis_type_annotations {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(rt_vis_type_annotations);
                         let num_annotations = read_u16(data_ptr, &mut location);
                         let mut annotations = Vec::with_capacity(num_annotations as usize);
                         while annotations.capacity() > annotations.len() {
@@ -469,9 +461,7 @@ impl ClassFile {
                         rt_vis_type_annotations = Some(annotations);
                     },
                     "RuntimeInvisibleTypeAnnotations" => {
-                        if let Some(_) = rt_invis_type_annotations {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(rt_invis_type_annotations);
                         let num_annotations = read_u16(data_ptr, &mut location);
                         let mut annotations = Vec::with_capacity(num_annotations as usize);
                         while annotations.capacity() > annotations.len() {
@@ -526,9 +516,7 @@ impl ClassFile {
                 let starting_location = location;
                 match name {
                     "Code" => {
-                        if let Some(_) = code {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(code);
                         let max_stack = read_u16(data_ptr, &mut location);
                         let max_locals = read_u16(data_ptr, &mut location);
                         let code_length = read_u32(data_ptr, &mut location);
@@ -602,9 +590,7 @@ impl ClassFile {
                                     local_variable_type_table.push(table);
                                 },
                                 "StackMapTable" => {
-                                    if let Some(_) = stack_map_table {
-                                        return Err(Error::IllegalDuplicateAttribute);
-                                    }
+                                    illegal_duplicate!(stack_map_table);
                                     let table_length = read_u16(data_ptr, &mut location);
                                     let mut table = Vec::with_capacity(table_length as usize);
                                     while table.capacity() > table.len() {
@@ -646,9 +632,7 @@ impl ClassFile {
                                     stack_map_table = Some(table);
                                 },
                                 "RuntimeVisibleTypeAnnotations" => {
-                                    if let Some(_) = code_rt_vis_type_annotations {
-                                        return Err(Error::IllegalDuplicateAttribute);
-                                    }
+                                    illegal_duplicate!(code_rt_vis_type_annotations);
                                     let num_annotations = read_u16(data_ptr, &mut location);
                                     let mut annotations = Vec::with_capacity(num_annotations as usize);
                                     while annotations.capacity() > annotations.len() {
@@ -657,9 +641,8 @@ impl ClassFile {
                                     code_rt_vis_type_annotations = Some(annotations);
                                 },
                                 "RuntimeInvisibleTypeAnnotations" => {
-                                    if let Some(_) = code_rt_invis_type_annotations {
-                                        return Err(Error::IllegalDuplicateAttribute);
-                                    }
+
+                                    illegal_duplicate!(code_rt_invis_type_annotations);
                                     let num_annotations = read_u16(data_ptr, &mut location);
                                     let mut annotations = Vec::with_capacity(num_annotations as usize);
                                     while annotations.capacity() > annotations.len() {
@@ -685,9 +668,7 @@ impl ClassFile {
                         });
                     },
                     "Exceptions" => {
-                        if let Some(_) = exceptions {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(exceptions);
                         let num_exceptions = read_u16(data_ptr, &mut location);
                         let mut exception_table = Vec::with_capacity(num_exceptions as usize);
                         while exception_table.capacity() > exception_table.len() {
@@ -696,9 +677,7 @@ impl ClassFile {
                         exceptions = Some(exception_table);
                     },
                     "RuntimeVisibleParameterAnnotations" => {
-                        if let Some(_) = rt_vis_param_annotations {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(rt_vis_param_annotations);
                         let num_param_annotations = read_u16(data_ptr, &mut location);
                         let mut param_annotations = Vec::with_capacity(num_param_annotations as usize);
                         while param_annotations.capacity() > param_annotations.len() {
@@ -712,9 +691,7 @@ impl ClassFile {
                         rt_vis_param_annotations = Some(param_annotations);
                     },
                     "RuntimeInvisibleParameterAnnotations" => {
-                        if let Some(_) = rt_invis_param_annotations {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(rt_invis_param_annotations);
                         let num_param_annotations = read_u16(data_ptr, &mut location);
                         let mut param_annotations = Vec::with_capacity(num_param_annotations as usize);
                         while param_annotations.capacity() > param_annotations.len() {
@@ -728,15 +705,11 @@ impl ClassFile {
                         rt_invis_param_annotations = Some(param_annotations);
                     },
                     "AnnotationDefault" => {
-                        if let Some(_) = annotation_default {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(annotation_default);
                         annotation_default = Some(ElementValue::new(data_ptr, &mut location)?);
                     },
                     "MethodParameters" => {
-                        if let Some(_) = method_parameters {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(method_parameters);
                         let num_params = read_u8(data_ptr, &mut location);
                         let mut parameters = Vec::with_capacity(num_params as usize);
                         while parameters.capacity() > parameters.len() {
@@ -750,16 +723,12 @@ impl ClassFile {
                     "Synthetic" => synthetic = true,
                     "Deprecated" => deprecated = true,
                     "Signature" => {
-                        if let Some(_) = signature {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(signature);
                         let index = read_u16(data_ptr, &mut location);
                         signature = Some(index);
                     },
                     "RuntimeVisibleAnnotations" => {
-                        if let Some(_) = rt_vis_annotations {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(rt_vis_annotations);
                         let num_annotations = read_u16(data_ptr, &mut location);
                         let mut annotations = Vec::with_capacity(num_annotations as usize);
                         while annotations.capacity() > annotations.len() {
@@ -768,9 +737,7 @@ impl ClassFile {
                         rt_vis_annotations = Some(annotations);
                     },
                     "RuntimeInvisibleAnnotations" => {
-                        if let Some(_) = rt_invis_annotations {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(rt_invis_annotations);
                         let num_annotations = read_u16(data_ptr, &mut location);
                         let mut annotations = Vec::with_capacity(num_annotations as usize);
                         while annotations.capacity() > annotations.len() {
@@ -779,9 +746,7 @@ impl ClassFile {
                         rt_invis_annotations = Some(annotations);
                     },
                     "RuntimeVisibleTypeAnnotations" => {
-                        if let Some(_) = rt_vis_type_annotations {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(rt_vis_type_annotations);
                         let num_annotations = read_u16(data_ptr, &mut location);
                         let mut annotations = Vec::with_capacity(num_annotations as usize);
                         while annotations.capacity() > annotations.len() {
@@ -790,9 +755,7 @@ impl ClassFile {
                         rt_vis_type_annotations = Some(annotations);
                     },
                     "RuntimeInvisibleTypeAnnotations" => {
-                        if let Some(_) = rt_invis_type_annotations {
-                            return Err(Error::IllegalDuplicateAttribute);
-                        }
+                        illegal_duplicate!(rt_invis_type_annotations);
                         let num_annotations = read_u16(data_ptr, &mut location);
                         let mut annotations = Vec::with_capacity(num_annotations as usize);
                         while annotations.capacity() > annotations.len() {
@@ -853,15 +816,11 @@ impl ClassFile {
             let length = read_u32(data_ptr, &mut location);
             match name {
                 "SourceFile" => {
-                    if let Some(_) = source_file {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(source_file);
                     source_file = Some(read_u16(data_ptr, &mut location));
                 },
                 "InnerClasses" => {
-                    if let Some(_) = inner_classes {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(inner_classes);
                     let num_classes = read_u16(data_ptr, &mut location);
                     let mut classes = Vec::with_capacity(num_classes as usize);
                     while classes.capacity() > classes.len() {
@@ -875,18 +834,14 @@ impl ClassFile {
                     inner_classes = Some(classes);
                 }
                 "EnclosingMethod" => {
-                    if let Some(_) = enclosing_method {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(enclosing_method);
                     enclosing_method = Some(EnclosingMethod {
                         class_index: read_u16(data_ptr, &mut location),
                         method_index: read_u16(data_ptr, &mut location),
                     });
                 },
                 "SourceDebugExtension" => {
-                    if let Some(_) = source_debug_extension {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(source_debug_extension);
                     let mut extension = Vec::with_capacity(length as usize);
                     while extension.capacity() > extension.len() {
                         extension.push(read_u8(data_ptr, &mut location));
@@ -894,9 +849,7 @@ impl ClassFile {
                     source_debug_extension = Some(extension);
                 }
                 "BootstrapMethods" => {
-                    if let Some(_) = bootstrap_methods {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(bootstrap_methods);
                     let numethods = read_u16(data_ptr, &mut location);
                     let mut methods = Vec::with_capacity(numethods as usize);
                     while methods.capacity() > methods.len() {
@@ -914,9 +867,7 @@ impl ClassFile {
                     bootstrap_methods = Some(methods);
                 },
                 "Module" => {
-                    if let Some(_) = module {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(module);
                     let name_index = read_u16(data_ptr, &mut location);
                     let flags = read_u16(data_ptr, &mut location);
                     let version_index = read_u16(data_ptr, &mut location);
@@ -992,9 +943,7 @@ impl ClassFile {
                     })
                 }
                 "ModulePackages" => {
-                    if let Some(_) = module_packages {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(module_packages);
                     let package_count = read_u16(data_ptr, &mut location);
                     let mut packages = Vec::with_capacity(package_count as usize);
                     while packages.capacity() > packages.len() {
@@ -1003,21 +952,15 @@ impl ClassFile {
                     module_packages = Some(packages);
                 }
                 "ModuleMainClass" => {
-                    if let Some(_) = module_main_class {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(module_main_class);
                     module_main_class = Some(read_u16(data_ptr, &mut location));
                 }
                 "NestHost" => {
-                    if let Some(_) = nest_host {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(nest_host);
                     nest_host = Some(read_u16(data_ptr, &mut location));
                 }
                 "NestMembers" => {
-                    if let Some(_) = nest_members {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(nest_members);
                     let num_members = read_u16(data_ptr, &mut location);
                     let mut members = Vec::with_capacity(num_members as usize);
                     while members.capacity() > members.len() {
@@ -1026,9 +969,7 @@ impl ClassFile {
                     nest_members = Some(members);
                 }
                 "Record" => {
-                    if let Some(_) = record {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(record);
                     let num_components = read_u16(data_ptr, &mut location);
                     let mut record_components = Vec::with_capacity(num_components as usize);
                     while record_components.capacity() > record_components.len() {
@@ -1049,16 +990,12 @@ impl ClassFile {
                             let length_record = read_u32(data_ptr, &mut location);
                             match name_record {
                                 "Signature" => {
-                                    if let Some(_) = record_signature {
-                                        return Err(Error::IllegalDuplicateAttribute);
-                                    }
+                                    illegal_duplicate!(record_signature);
                                     let index = read_u16(data_ptr, &mut location);
                                     record_signature = Some(index);
                                 },
                                 "RuntimeVisibleAnnotations" => {
-                                    if let Some(_) = record_rt_vis_annotations {
-                                        return Err(Error::IllegalDuplicateAttribute);
-                                    }
+                                    illegal_duplicate!(record_rt_vis_annotations);
                                     let num_annotations = read_u16(data_ptr, &mut location);
                                     let mut annotations = Vec::with_capacity(num_annotations as usize);
                                     while annotations.capacity() > annotations.len() {
@@ -1067,9 +1004,7 @@ impl ClassFile {
                                     record_rt_vis_annotations = Some(annotations);
                                 },
                                 "RuntimeInvisibleAnnotations" => {
-                                    if let Some(_) = record_rt_invis_annotations {
-                                        return Err(Error::IllegalDuplicateAttribute);
-                                    }
+                                    illegal_duplicate!(record_rt_invis_annotations);
                                     let num_annotations = read_u16(data_ptr, &mut location);
                                     let mut annotations = Vec::with_capacity(num_annotations as usize);
                                     while annotations.capacity() > annotations.len() {
@@ -1078,9 +1013,7 @@ impl ClassFile {
                                     record_rt_invis_annotations = Some(annotations);
                                 },
                                 "RuntimeVisibleTypeAnnotations" => {
-                                    if let Some(_) = record_rt_vis_type_annotations {
-                                        return Err(Error::IllegalDuplicateAttribute);
-                                    }
+                                    illegal_duplicate!(record_rt_vis_type_annotations);
                                     let num_annotations = read_u16(data_ptr, &mut location);
                                     let mut annotations = Vec::with_capacity(num_annotations as usize);
                                     while annotations.capacity() > annotations.len() {
@@ -1089,9 +1022,7 @@ impl ClassFile {
                                     record_rt_vis_type_annotations = Some(annotations);
                                 },
                                 "RuntimeInvisibleTypeAnnotations" => {
-                                    if let Some(_) = record_rt_invis_type_annotations {
-                                        return Err(Error::IllegalDuplicateAttribute);
-                                    }
+                                    illegal_duplicate!(record_rt_invis_type_annotations);
                                     let num_annotations = read_u16(data_ptr, &mut location);
                                     let mut annotations = Vec::with_capacity(num_annotations as usize);
                                     while annotations.capacity() > annotations.len() {
@@ -1108,9 +1039,7 @@ impl ClassFile {
                     record = Some(record_components);
                 }
                 "PermittedSubclasses" => {
-                    if let Some(_) = permitted_subclasses {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(permitted_subclasses);
                     let num_classes = read_u16(data_ptr, &mut location);
                     let mut classes = Vec::with_capacity(num_classes as usize);
                     while classes.capacity() > classes.len() {
@@ -1121,16 +1050,12 @@ impl ClassFile {
                 "Synthetic" => synthetic = true,
                 "Deprecated" => deprecated = true,
                 "Signature" => {
-                    if let Some(_) = signature {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(signature);
                     let index = read_u16(data_ptr, &mut location);
                     signature = Some(index);
                 },
                 "RuntimeVisibleAnnotations" => {
-                    if let Some(_) = rt_vis_annotations {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(rt_vis_annotations);
                     let num_annotations = read_u16(data_ptr, &mut location);
                     let mut annotations = Vec::with_capacity(num_annotations as usize);
                     while annotations.capacity() > annotations.len() {
@@ -1139,9 +1064,7 @@ impl ClassFile {
                     rt_vis_annotations = Some(annotations);
                 },
                 "RuntimeInvisibleAnnotations" => {
-                    if let Some(_) = rt_vis_annotations {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(rt_invis_annotations);
                     let num_annotations = read_u16(data_ptr, &mut location);
                     let mut annotations = Vec::with_capacity(num_annotations as usize);
                     while annotations.capacity() > annotations.len() {
@@ -1150,9 +1073,7 @@ impl ClassFile {
                     rt_invis_annotations = Some(annotations);
                 },
                 "RuntimeVisibleTypeAnnotations" => {
-                    if let Some(_) = rt_vis_annotations {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(rt_vis_type_annotations);
                     let num_annotations = read_u16(data_ptr, &mut location);
                     let mut annotations = Vec::with_capacity(num_annotations as usize);
                     while annotations.capacity() > annotations.len() {
@@ -1161,9 +1082,7 @@ impl ClassFile {
                     rt_vis_type_annotations = Some(annotations);
                 },
                 "RuntimeInvisibleTypeAnnotations" => {
-                    if let Some(_) = rt_vis_annotations {
-                        return Err(Error::IllegalDuplicateAttribute);
-                    }
+                    illegal_duplicate!(rt_invis_type_annotations);
                     let num_annotations = read_u16(data_ptr, &mut location);
                     let mut annotations = Vec::with_capacity(num_annotations as usize);
                     while annotations.capacity() > annotations.len() {
@@ -1218,144 +1137,144 @@ use std::fmt;
 
 impl fmt::Display for  ClassFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Version: {}.{}\n", self.major_version, self.minor_version)?;
-        write!(f, "Size of Constant Pool: {}\n", self.constant_pool.len())?;
-        write!(f, "Constant Pool:\n")?;
+        writeln!(f, "Version: {}.{}", self.major_version, self.minor_version)?;
+        writeln!(f, "Size of Constant Pool: {}", self.constant_pool.len())?;
+        writeln!(f, "Constant Pool:")?;
         for entry in &self.constant_pool {
-            write!(f, "{}\n", entry)?;
+            write!(f, "{entry}")?;
         }
-        write!(f, "Access flags: {}\n", self.access_flags)?;
-        write!(f, "This class index: {}\n", self.this_class_index)?;
-        write!(f, "This class entry:\n")?;
+        writeln!(f, "Access flags: {}", self.access_flags)?;
+        writeln!(f, "This class index: {}", self.this_class_index)?;
+        writeln!(f, "This class entry:")?;
         let this_index = self.cp_entry(self.this_class_index).unwrap();
-        write!(f, "{}\n", this_index)?;
-        write!(f, "This class name:\n")?;
-        write!(f, "{}\n", self.cp_entry(*this_index.as_class().unwrap()).unwrap())?;
+        writeln!(f, "{this_index}")?;
+        writeln!(f, "This class name:")?;
+        writeln!(f, "{}", self.cp_entry(*this_index.as_class().unwrap()).unwrap())?;
         if self.has_super() {
-            write!(f, "Super class index: {}\n", self.super_class_index)?;
-            write!(f, "Super class entry:\n")?;
+            writeln!(f, "Super class index: {}", self.super_class_index)?;
+            writeln!(f, "Super class entry:")?;
             let super_index = self.cp_entry(self.super_class_index).unwrap();
-            write!(f, "{}\n", super_index)?;
-            write!(f, "Super class name:\n")?;
-            write!(f, "{}\n", self.cp_entry(*super_index.as_class().unwrap()).unwrap())?;
+            writeln!(f, "{super_index}")?;
+            writeln!(f, "Super class name:")?;
+            writeln!(f, "{}", self.cp_entry(*super_index.as_class().unwrap()).unwrap())?;
         }
         else {
-            write!(f, "This class has no super class\n")?;
+            writeln!(f, "This class has no super class")?;
         }
-        write!(f, "Number of interfaces: {}\n", self.interfaces.len())?;
-        write!(f, "Interfaces:\n")?;
+        writeln!(f, "Number of interfaces: {}", self.interfaces.len())?;
+        writeln!(f, "Interfaces:")?;
         for interface in &self.interfaces {
-            write!(f, "Interface index: {}\n", interface)?;
-            write!(f, "Interface: \n")?;
-            write!(f, "{}\n", self.cp_entry(*interface).unwrap())?;
+            writeln!(f, "Interface index: {interface}")?;
+            writeln!(f, "Interface: ")?;
+            write!(f, "{}", self.cp_entry(*interface).unwrap())?;
         }
-        write!(f, "Number of fields: {}\n", self.fields.len())?;
-        write!(f, "Fields:\n")?;
+        writeln!(f, "Number of fields: {}", self.fields.len())?;
+        writeln!(f, "Fields:")?;
         for field in &self.fields {
-            write!(f, "{:#?}\n", field)?;
+            write!(f, "{field:#?}")?;
         }
-        write!(f, "Number of methods: {}\n", self.methods.len())?;
-        write!(f, "Methods:\n")?;
+        writeln!(f, "Number of methods: {}", self.methods.len())?;
+        writeln!(f, "Methods:")?;
         for method in &self.methods {
-            write!(f, "{:#?}\n", method)?;
+            write!(f, "{method:#?}")?;
         }
         if let Some(file) = self.source_file {
-            write!(f, "Source file index: {}\n", file)?;
-            write!(f, "Source file: {}\n", self.cp_entry(file).unwrap())?;
+            writeln!(f, "Source file index: {file}")?;
+            writeln!(f, "Source file: {}", self.cp_entry(file).unwrap())?;
         }
         else {
-            write!(f, "This class has no SourceFile attribute\n")?;
+            writeln!(f, "This class has no SourceFile attribute")?;
         }
         if let Some(classes) = &self.inner_classes {
-            write!(f, "Number of inner classes: {}\n", classes.len())?;
-            write!(f, "Inner classes:\n")?;
+            writeln!(f, "Number of inner classes: {}", classes.len())?;
+            writeln!(f, "Inner classes:")?;
             for class in classes {
-                write!(f, "{:#?}", class)?;
+                write!(f, "{class:#?}")?;
             }
         }
         else {
-            write!(f, "This class has no InnerClasses attribute\n")?;
+            writeln!(f, "This class has no InnerClasses attribute")?;
         }
         if let Some(method) = &self.enclosing_method {
-            write!(f, "Enclosing method: {:#?}\n", method)?;
+            writeln!(f, "Enclosing method: {method:#?}")?;
         }
         else {
-            write!(f, "This class has no EnclosingMethod attribute\n")?;
+            writeln!(f, "This class has no EnclosingMethod attribute")?;
         }
         if let Some(extension) = &self.source_debug_extension {
-            write!(f, "Source debug extension: {:#?}\n", extension);
+            writeln!(f, "Source debug extension: {extension:#?}")?;
         }
         else {
-            write!(f, "This class has no SourceDebugExtension attribute\n")?;
+            writeln!(f, "This class has no SourceDebugExtension attribute")?;
         }
         if let Some(bootstraps) = &self.bootstrap_methods {
-            write!(f, "Number of bootstrap methods; {}\n", bootstraps.len())?;
-            write!(f, "Bootstrap methods:\n")?;
+            writeln!(f, "Number of bootstrap methods; {}", bootstraps.len())?;
+            writeln!(f, "Bootstrap methods:")?;
             for method in bootstraps {
-                write!(f, "{:#?}\n", method);
+                write!(f, "{method:#?}")?;
             }
         }
         else {
-            write!(f, "This class has no BootstrapMethods attribute\n")?;
+            writeln!(f, "This class has no BootstrapMethods attribute")?;
         }
         if let Some(module) = &self.module {
-            write!(f, "Module: {:#?}\n", module);
+            writeln!(f, "Module: {module:#?}")?;
         }
         else {
-            write!(f, "This class has no Module attribute\n")?;
+            writeln!(f, "This class has no Module attribute")?;
         }
         if let Some(packages) = &self.module_packages {
-            write!(f, "Number of module packages: {}\n", packages.len())?;
-            write!(f, "Module packages:\n")?;
+            writeln!(f, "Number of module packages: {}", packages.len())?;
+            writeln!(f, "Module packages:")?;
             for package_index in packages {
                 write!(f, "{}", self.cp_entry(*package_index).unwrap())?;
             }
         }
         else {
-            write!(f, "This class has no ModulePackages attribute\n")?;
+            writeln!(f, "This class has no ModulePackages attribute")?;
         }
         if let Some(main_class) = self.module_main_class {
-            write!(f, "Module main class index: {}\n", main_class)?;
-            write!(f, "Module main class: {}\n", self.cp_entry(main_class).unwrap())?;
+            writeln!(f, "Module main class index: {main_class}")?;
+            writeln!(f, "Module main class: {}", self.cp_entry(main_class).unwrap())?;
         }
         else {
-            write!(f, "This class has no ModuleMainClass attribute\n")?;
+            writeln!(f, "This class has no ModuleMainClass attribute")?;
         }
         if let Some(host) = self.nest_host {
-            write!(f, "Host class: {}", self.cp_entry(host).unwrap())?;
+            writeln!(f, "Host class: {}", self.cp_entry(host).unwrap())?;
         }
         else {
-            write!(f, "This class has no NestHost attribute\n")?;
+            writeln!(f, "This class has no NestHost attribute")?;
         }
         if let Some(members) = &self.nest_members {
-            write!(f, "Number of nest members: {}\n", members.len())?;
-            write!(f, "Nest members:\n");
+            writeln!(f, "Number of nest members: {}", members.len())?;
+            writeln!(f, "Nest members:")?;
             for member in members {
-                write!(f, "{}\n", self.cp_entry(*member).unwrap())?;
+                write!(f, "{}", self.cp_entry(*member).unwrap())?;
             }
         }
         else {
-            write!(f, "This class has no NestMembers attribute\n")?;
+            writeln!(f, "This class has no NestMembers attribute")?;
         }
         if let Some(record) = &self.record {
             writeln!(f, "Number of record components: {}", record.len())?;
             writeln!(f, "Record components:")?;
             for component in record {
-                writeln!(f, "{:#?}\n", component)?;
+                write!(f, "{component:#?}")?;
             }
         }
         else {
-            write!(f, "This class has no Record attribute\n")?;
+            writeln!(f, "This class has no Record attribute")?;
         }
         if let Some(subclasses) = &self.permitted_subclasses {
             writeln!(f, "Number of permitted subclasses: {}", subclasses.len())?;
             writeln!(f, "Permitted subclasses:")?;
             for class in subclasses {
-                writeln!(f, "{}", self.cp_entry(*class).unwrap())?;
+                write!(f, "{}", self.cp_entry(*class).unwrap())?;
             } 
         }
         else {
-            write!(f, "This class has no PermittedSubclasses attribute\n")?;
+            writeln!(f, "This class has no PermittedSubclasses attribute")?;
         }
         if self.synthetic {
             writeln!(f, "This class is synthetic")?;
@@ -1364,46 +1283,46 @@ impl fmt::Display for  ClassFile {
             writeln!(f, "WARNING: This class is deprecated, and should not be used")?;
         }
         if let Some(signature) = self.signature {
-            write!(f, "Class signature: {}", self.cp_entry(signature).unwrap())?;
+            writeln!(f, "Class signature: {}", self.cp_entry(signature).unwrap())?;
         }
         else {
-            write!(f, "This class has no Signature attribute\n")?;
+            writeln!(f, "This class has no Signature attribute")?;
         }
         if let Some(annotations) = &self.rt_vis_annotations {
             writeln!(f, "Number of visible annotations: {}", annotations.len())?;
             writeln!(f, "Visible annotations:")?;
             for annotation in annotations {
-                writeln!(f, "{:#?}", annotation)?;
+                write!(f, "{annotation:#?}")?;
             }
         }
         else {
-            write!(f, "This class has no RuntimeVisibleAnnotations attribute\n")?;
+            writeln!(f, "This class has no RuntimeVisibleAnnotations attribute")?;
         } 
         if let Some(annotations) = &self.rt_invis_annotations {
             writeln!(f, "Number of invisible annotations: {}", annotations.len())?;
             writeln!(f, "Invisible annotations:")?;
             for annotation in annotations {
-                writeln!(f, "{:#?}", annotation)?;
+                write!(f, "{annotation:#?}")?;
             }
         }
         else {
-            write!(f, "This class has no RuntimeInvisibleAnnotations attribute\n")?;
+            writeln!(f, "This class has no RuntimeInvisibleAnnotations attribute")?;
         } 
         if let Some(annotations) = &self.rt_vis_type_annotations {
             writeln!(f, "Number of visible type annotations: {}", annotations.len())?;
             writeln!(f, "Visible type annotations:")?;
             for annotation in annotations {
-                writeln!(f, "{:#?}", annotation)?;
+                write!(f, "{annotation:#?}")?;
             }
         }
         else {
-            write!(f, "This class has no RuntimeVisibleAnnotations attribute\n")?;
+            writeln!(f, "This class has no RuntimeVisibleAnnotations attribute")?;
         } 
         if let Some(annotations) = &self.rt_invis_type_annotations {
             writeln!(f, "Number of invisible type annotations: {}", annotations.len())?;
             writeln!(f, "Invisible type annotations:")?;
             for annotation in annotations {
-                writeln!(f, "{:#?}", annotation)?;
+                write!(f, "{annotation:#?}")?;
             }
             Ok(())
         }

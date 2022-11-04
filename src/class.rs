@@ -10,8 +10,8 @@ pub mod system;
  
 pub trait Class {
     fn new(file: classfile::ClassFile, jvm: &mut JVM) -> Result<Self, Error> where Self : Sized;
-    fn get_static(&self, name: &String, descriptor: &String, jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error>;
-    fn put_static(&mut self, name: &String, descriptor: &String, value:  Value<dyn Class, dyn Object>, jvm: &mut JVM) -> Result<(), Error>;
+    fn get_static(&self, name: &str, descriptor: &str, jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error>;
+    fn put_static(&mut self, name: &str, descriptor: &str, value:  Value<dyn Class, dyn Object>, jvm: &mut JVM) -> Result<(), Error>;
     fn exec_method(self: Rc<Self>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error>; // Figure out what else to pass
     fn get_class_file(&self) -> Rc<ClassFile>;
     fn as_any(&self) ->  &dyn Any;

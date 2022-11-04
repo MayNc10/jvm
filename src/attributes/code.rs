@@ -17,6 +17,9 @@ pub mod stack_map_table {
     }
 
     impl VerificationTypeInfo {
+        /// # Safety
+        ///  
+        /// This function is unsafe because the caller has to guarantee that valid bytes exist at ```data_ptr```
         pub unsafe fn new(data_ptr: *const u8, location: &mut isize) -> Result<VerificationTypeInfo, Error> {
             match crate::data_access::read_u8(data_ptr, location) {
                 0 => Ok(VerificationTypeInfo::Top),
@@ -29,7 +32,7 @@ pub mod stack_map_table {
                 7 => Ok(VerificationTypeInfo::Object(crate::data_access::read_u16(data_ptr, location))),
                 8 => Ok(VerificationTypeInfo::Uninitialized(crate::data_access::read_u16(data_ptr, location))),
                 any => {
-                    println!("Found VerificationType {}", any);
+                    eprintln!("Found VerificationType {any}");
                     Err(Error::IllegalVerificationType)
                 }
             }
@@ -105,7 +108,7 @@ impl fmt::Display for Code {
         writeln!(f, "Code Length: {}", self.code.len())?;
         writeln!(f, "Code:")?;
         while code_index < self.code.len() {
-            write!(f, "    ")?;
+            write!(f, "{code_index:>4}: ")?;
             match self.code[code_index] {
                 // TODO: WIDE  
                 0 => writeln!(f, "nop")?,
@@ -132,7 +135,7 @@ impl fmt::Display for Code {
                     let num = unsafe {
                         i16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())   
                     };
-                    writeln!(f, "sipush {}", num)?;
+                    writeln!(f, "sipush {num}")?;
                     code_index += 2;
                 },
                 18 => {
@@ -143,14 +146,14 @@ impl fmt::Display for Code {
                     let num = unsafe {
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())   
                     };
-                    writeln!(f, "ldc_w #{}", num)?;
+                    writeln!(f, "ldc_w #{num}")?;
                     code_index += 2;
                 },
                 20 => {
                     let num = unsafe {
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())   
                     };
-                    writeln!(f, "ldc2_w #{}", num)?;
+                    writeln!(f, "ldc2_w #{num}")?;
                     code_index += 2;
                 },
                 21 => {
@@ -297,7 +300,7 @@ impl fmt::Display for Code {
                 132 => {
                     let index = self.code[code_index + 1];
                     let const_ = self.code[code_index + 2];
-                    writeln!(f, "iinc #{} {}", index, const_)?;
+                    writeln!(f, "iinc #{index} {const_}")?;
                     code_index += 2;
                 },
                 133 => writeln!(f, "i2l")?,
@@ -324,117 +327,117 @@ impl fmt::Display for Code {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "ifeq {}", branch)?;
+                    writeln!(f, "ifeq {branch}")?;
                     code_index += 2;
                 },
                 154 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "ifne {}", branch)?;
+                    writeln!(f, "ifne {branch}")?;
                     code_index += 2;
                 },
                 155 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "iflt {}", branch)?;
+                    writeln!(f, "iflt {branch}")?;
                     code_index += 2;
                 },
                 156 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "ifge {}", branch)?;
+                    writeln!(f, "ifge {branch}")?;
                     code_index += 2;
                 },
                 157 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "ifgt {}", branch)?;
+                    writeln!(f, "ifgt {branch}")?;
                     code_index += 2;
                 },
                 158 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "ifle {}", branch)?;
+                    writeln!(f, "ifle {branch}")?;
                     code_index += 2;
                 },
                 159 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "if_icmpeq {}", branch)?;
+                    writeln!(f, "if_icmpeq {branch}")?;
                     code_index += 2;
                 },
                 160 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "if_icmpne {}", branch)?;
+                    writeln!(f, "if_icmpne {branch}")?;
                     code_index += 2;
                 },
                 161 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "if_icmplt {}", branch)?;
+                    writeln!(f, "if_icmplt {branch}")?;
                     code_index += 2;
                 },
                 162 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "if_icmpge {}", branch)?;
+                    writeln!(f, "if_icmpge {branch}")?;
                     code_index += 2;
                 },
                 163 => {
                     let branch = unsafe {                      
-                        u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
+                        i16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "if_icmpgt {}", branch)?;
+                    writeln!(f, "if_icmpgt {branch} // Line {}", branch + code_index as i16 )?;
                     code_index += 2;
                 },
                 164 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "if_icmple {}", branch)?;
+                    writeln!(f, "if_icmple {branch}")?;
                     code_index += 2;
                 },
                 165 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "if_acmpeq {}", branch)?;
+                    writeln!(f, "if_acmpeq {branch}")?;
                     code_index += 2;
                 },
                 166 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "if_acmpne {}", branch)?;
+                    writeln!(f, "if_acmpne {branch}")?;
                     code_index += 2;
                 },
                 167 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "goto {}", branch)?;
+                    writeln!(f, "goto {branch}")?;
                     code_index += 2;
                 },
                 168 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "jsr {}", branch)?;
+                    writeln!(f, "jsr {branch}")?;
                     code_index += 2;
                 },
                 169 => {     
                     let index = self.code[code_index + 1];                        
-                    writeln!(f, "ret #{}", index)?;
+                    writeln!(f, "ret #{index}")?;
                     code_index += 2;
                 },
                 170 => {
@@ -453,84 +456,84 @@ impl fmt::Display for Code {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "getstatic #{}", index)?;
+                    writeln!(f, "getstatic #{index}")?;
                     code_index += 2;
                 },
                 179 => {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "putstatic #{}", index)?;
+                    writeln!(f, "putstatic #{index}")?;
                     code_index += 2;
                 },
                 180 => {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "getfield #{}", index)?;
+                    writeln!(f, "getfield #{index}")?;
                     code_index += 2;
                 },
                 181 => {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "putfield #{}", index)?;
+                    writeln!(f, "putfield #{index}")?;
                     code_index += 2;
                 },
                 182 => {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "invokevirtual #{}", index)?;
+                    writeln!(f, "invokevirtual #{index}")?;
                     code_index += 2;
                 },
                 183 => {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "invokespecial #{}", index)?;
+                    writeln!(f, "invokespecial #{index}")?;
                     code_index += 2;
                 },
                 184 => {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "invokestatic #{}", index)?;
+                    writeln!(f, "invokestatic #{index}")?;
                     code_index += 2;
                 },
                 185 => {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "invokeinterface #{}", index)?;
+                    writeln!(f, "invokeinterface #{index}")?;
                     code_index += 4;
                 },
                 186 => {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "invokedynamic #{}", index)?;
+                    writeln!(f, "invokedynamic #{index}")?;
                     code_index += 4;
                 },
                 187 => {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "new #{}", index)?;
+                    writeln!(f, "new #{index}")?;
                     code_index += 2;
                 },
                 188 => {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "newarray #{}", index)?;
+                    writeln!(f, "newarray #{index}")?;
                     code_index += 2;
                 },
                 189 => {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "anewarray #{}", index)?;
+                    writeln!(f, "anewarray #{index}")?;
                     code_index += 2;
                 },
                 190 => writeln!(f, "arraylength")?,
@@ -539,14 +542,14 @@ impl fmt::Display for Code {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "checkcast #{}", index)?;
+                    writeln!(f, "checkcast #{index}")?;
                     code_index += 2;
                 },
                 193 => {
                     let index = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "instanceof #{}", index)?;
+                    writeln!(f, "instanceof #{index}")?;
                     code_index += 2;
                 },
                 194 => writeln!(f, "monitorenter")?,
@@ -557,49 +560,41 @@ impl fmt::Display for Code {
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
                     let dimensions = self.code[code_index + 3];
-                    writeln!(f, "multianewarray #{} {}", index, dimensions)?;
+                    writeln!(f, "multianewarray #{index} {dimensions}")?;
                     code_index += 3;
                 },
                 198 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "ifnull #{}", branch)?;
+                    writeln!(f, "ifnull #{branch}")?;
                     code_index += 2;
                 },
                 199 => {
                     let branch = unsafe {                      
                         u16::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 2).try_into().unwrap())                      
                     };
-                    writeln!(f, "ifnonnull #{}", branch)?;
+                    writeln!(f, "ifnonnull #{branch}")?;
                     code_index += 2;
                 },
                 200 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u32;
-                        let b2 = self.code[code_index + 2] as u32;
-                        let b3 = self.code[code_index + 3] as u32;
-                        let b4 = self.code[code_index + 4] as u32;
-                        b1 << 24 + b2 << 16 + b3 << 8 + b4
+                    let branch = unsafe {
+                        u32::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 4).try_into().unwrap())
                     };
-                    writeln!(f, "goto_w {}", branch)?;
+                    writeln!(f, "goto_w {branch}")?;
                     code_index += 4;
                 },
                 201 => {
-                    let branch = {
-                        let b1 = self.code[code_index + 1] as u32;
-                        let b2 = self.code[code_index + 2] as u32;
-                        let b3 = self.code[code_index + 3] as u32;
-                        let b4 = self.code[code_index + 4] as u32;
-                        b1 << 24 + b2 << 16 + b3 << 8 + b4
+                    let branch = unsafe {
+                        u32::from_be_bytes(std::slice::from_raw_parts(self.code.as_ptr().add(code_index + 1), 4).try_into().unwrap())
                     };
-                    writeln!(f, "jsr_w {}", branch)?;
+                    writeln!(f, "jsr_w {branch}")?;
                     code_index += 4;
                 },
                 254 => writeln!(f, "imdep1")?,
                 255 => writeln!(f, "imdep2")?,
                 op => {
-                    panic!("Error: Opcode {} not supported yet", op);
+                    panic!("Error: Opcode {op} not supported yet");
                 },
             }
             code_index += 1;
@@ -607,28 +602,28 @@ impl fmt::Display for Code {
         writeln!(f, "Exception Table Size: {}", self.exception_table.len())?;
         writeln!(f, "Exception Table:")?;
         for e in &self.exception_table {
-            writeln!(f, "{:#?}", e)?;
+            writeln!(f, "{e:#?}")?;
         }
         writeln!(f, "Line Number Table Size: {}", self.line_number_table.len())?;
         writeln!(f, "Line Number Table:")?;
         for line in &self.line_number_table {
-            writeln!(f, "{:#?}", line)?;
+            writeln!(f, "{line:#?}")?;
         }
         writeln!(f, "Local Variable Table Size: {}", self.local_variable_table.len())?;
         writeln!(f, "Local Variable Table:")?;
         for local in &self.local_variable_table {
-            writeln!(f, "{:#?}", local)?;
+            writeln!(f, "{local:#?}")?;
         }
         writeln!(f, "Local Variable Type Table Size: {}", self.local_variable_type_table.len())?;
         writeln!(f, "Local Variable Type Table:")?;
         for local in &self.local_variable_type_table {
-            writeln!(f, "{:#?}", local)?;
+            writeln!(f, "{local:#?}")?;
         }
         if self.stack_map_table.is_some() {
             writeln!(f, "Stack Map Table Size: {}", self.stack_map_table.as_ref().unwrap().len())?;
             writeln!(f, "Stack Map Table:")?;
             for frame in self.stack_map_table.as_ref().unwrap() {
-                writeln!(f, "{:#?}", frame)?;
+                writeln!(f, "{frame:#?}")?;
             }
         }
         else {
@@ -638,7 +633,7 @@ impl fmt::Display for Code {
             writeln!(f, "Number of Runtime Visisble Type Annotation: {}", self.rt_vis_type_annotations.as_ref().unwrap().len())?;
             writeln!(f, "Runtime Visisble Type Annotation:")?;
             for annotation in self.rt_vis_type_annotations.as_ref().unwrap() {
-                writeln!(f, "{:#?}", annotation)?;
+                writeln!(f, "{annotation:#?}")?;
             }
         }
         else {
@@ -648,7 +643,7 @@ impl fmt::Display for Code {
             writeln!(f, "Number of Runtime Invisisble Type Annotation: {}", self.rt_invis_type_annotations.as_ref().unwrap().len())?;
             write!(f, "Runtime Invisisble Type Annotation:")?;
             for annotation in self.rt_invis_type_annotations.as_ref().unwrap() {
-                write!(f, "\n{:#?}", annotation)?;
+                write!(f, "\n{annotation:#?}")?;
             }
         }
         else {
@@ -660,6 +655,6 @@ impl fmt::Display for Code {
 
 impl fmt::Debug for Code {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }

@@ -1,13 +1,10 @@
 use crate::class::classfile::ClassFile;
 use crate::reference::array::Array;
 use crate::{access_macros, class};
-use crate::attributes::code::Exception;
 use crate::errorcodes::{Error, Opcode};
 use crate::class::{Class, classfile::MethodInfo};
-use crate::constant_pool::Entry;
 use crate::frame::Frame;
 use crate::reference::{Reference, Monitor};
-use crate::reference::object::Object;
 use crate::thread::Thread;
 use crate::value::{Value, VarValue};
 
@@ -32,7 +29,7 @@ const STEP_SIZE: usize = 10;
 pub struct Crash {
     has_crashed: bool,
     crash_reason: String,
-    base_traceback: String,
+    _base_traceback: String,
 } 
 
 pub struct JVM {
@@ -58,7 +55,7 @@ impl JVM {
             m_thrown_error: Error::None,
             m_crash_info: Crash{ has_crashed: false, 
                 crash_reason: String::from(""), 
-                base_traceback: String::from("")},
+                _base_traceback: String::from("")},
             m_thread_index: 0,
             m_step_size: STEP_SIZE,
             m_has_halted: false,
@@ -75,7 +72,7 @@ impl JVM {
             m_thrown_error: Error::None,
             m_crash_info: Crash{ has_crashed: false, 
                 crash_reason: String::from(""), 
-                base_traceback: String::from("")},
+                _base_traceback: String::from("")},
             m_thread_index: 0,
             m_step_size: step_size,
             m_has_halted: false,
@@ -95,7 +92,7 @@ impl JVM {
         let mut found_clinit = true;
         if let Err(e) = jvm.setup_method_call_from_name_on_main("<clinit>", "()V", true) {
             if e != Error::NoSuchMethodError(Opcode::MethodInvoke) {
-                println!("{:#?}", e);
+                println!("{e:#?}");
                 return Err(e);
             }
             found_clinit = false;
@@ -124,7 +121,7 @@ impl JVM {
         let mut f = match File::open(resolved_path.as_str()) {
             Ok(file) => file,
             Err(_) => {
-                println!("Path: {}", path);
+                println!("Path: {path}");
                 return Err(Error::NoClassDefFoundError(Opcode::ClassLoad));
             },
         };
@@ -132,9 +129,9 @@ impl JVM {
         let size = if metadata.len() % 8 == 0 {metadata.len() / 8} else {metadata.len() / 8 + 1};
         let buffer: Vec<u64> = vec![0; size as usize];
         let c = unsafe {
-            let mut buf_bytes = std::slice::from_raw_parts_mut(buffer.as_ptr() as *mut u8, buffer.len() * std::mem::size_of::<u64>());
-            f.read(&mut buf_bytes).unwrap();
-            class::new_class(class::classfile::ClassFile::new(&buf_bytes)?, self)?
+            let buf_bytes = std::slice::from_raw_parts_mut(buffer.as_ptr() as *mut u8, buffer.len() * std::mem::size_of::<u64>());
+            f.read_exact(buf_bytes).unwrap();
+            class::new_class(class::classfile::ClassFile::new(buf_bytes)?, self)?
         };
         // Adding the class to the map here seems a bit weird, but if we don't we overflow the stack.
         self.m_loaded_classes.insert(String::from(c.get_class_file().name()), Rc::clone(&c)); 
@@ -159,11 +156,11 @@ impl JVM {
         Ok(self.m_loaded_classes.get(reference).unwrap().clone())
     }
     // Use this for checking that the class derived is above the given class in the heiriarchy. 
-    pub fn resolve_with_derived_class(&self, reference: &str, derived: Rc<dyn Class>) -> Result<Rc<dyn Class>, &'static str> {
+    pub fn resolve_with_derived_class(&self, _reference: &str, _derived: Rc<dyn Class>) -> Result<Rc<dyn Class>, &'static str> {
         Err("todo")
     }
 
-    pub fn get_super(this_loaded_classes: &mut HashMap<String, Rc<dyn Class>>, derived: Rc<dyn Class>, level: usize) -> Option<Rc<dyn Class>> {
+    pub fn get_super(_this_loaded_classes: &mut HashMap<String, Rc<dyn Class>>, _derived: Rc<dyn Class>, _level: usize) -> Option<Rc<dyn Class>> {
         None
     }
     pub fn get_direct_super(this_loaded_classes: &mut HashMap<String, Rc<dyn Class>>, derived: Rc<dyn Class>) -> Option<Rc<dyn Class>> {
@@ -180,7 +177,7 @@ impl JVM {
     pub fn crash(&mut self, reason: &str, base_traceback: &str) {
         self.m_crash_info = Crash{has_crashed: true, 
                                   crash_reason: String::from(reason), 
-                                  base_traceback: String::from(base_traceback)};       
+                                  _base_traceback: String::from(base_traceback)};       
     }
     fn has_encoutered_error(&self) -> bool {
         // Used for checking whether to stop execution. 
@@ -193,11 +190,11 @@ impl JVM {
             let current_thread_index = self.m_thread_index;
             let thread = access_macros::current_thread_mut!(self);
             if thread.current_monitor.is_some() {
-                let mut monitor_rc = match &mut thread.current_monitor {
+                let monitor_rc = match &mut thread.current_monitor {
                     Some(mrc) => mrc,
                     None => unreachable!(),
                 };
-                let monitor = match Rc::get_mut(&mut monitor_rc) {
+                let monitor = match Rc::get_mut(monitor_rc) {
                     Some(m) => m,
                     None => {
                         self.m_thrown_error = Error::DoubleMutableReferenceToMonitor(Opcode::BlockedThread);
@@ -247,14 +244,15 @@ impl JVM {
                         current_class.get_class_file().cp_entry(frame.current_method.descriptor_index).unwrap().as_utf8().unwrap(), current_class.get_class_file().name());
                         println!("Local variables:");
                         for local in frame.local_variables.iter().rev() {
-                            println!("  {:#?}", local);
+                            println!("  {local:#?}");
                         }
                         println!("Operand stack:");
                         for operand in frame.op_stack.iter().rev() {
-                            println!("  {:#?}", operand);
+                            println!("  {operand:#?}");
                         }
-                        println!("Current pc: {}", frame.pc);
-                        //println!("Current code: {}", frame.current_method.code.as_ref().unwrap());
+                        println!("Current pc and instruction: {}, {}", frame.pc, frame.current_method.code_at(frame.pc).unwrap());
+                        println!("Current code: {}", frame.current_method.code.as_ref().unwrap());
+                        //println!("Current class: {}", current_class.get_class_file());
                     }
                 }
                 return;
@@ -300,7 +298,7 @@ impl JVM {
                     // This just means that we should crash.
                     self.m_crash_info.has_crashed = true;
                     // TODO: Add crash reason.
-                    self.m_crash_info.crash_reason = format!("{:#?}", e);
+                    self.m_crash_info.crash_reason = format!("{e:#?}");
                 }
             }
             if self.m_crash_info.has_crashed {
@@ -312,12 +310,12 @@ impl JVM {
 }
 
 
-impl<'a> JVM {
+impl JVM {
     pub fn step1(&mut self) {
         let wide: bool;
         let opcode = {
             let thread = self.current_thread();
-            if thread.m_stack.len() == 0 {
+            if thread.m_stack.is_empty() {
                 self.m_has_halted = true;
                 return;
             }
@@ -552,7 +550,7 @@ impl<'a> JVM {
 }
 
 // This could be made more readable if we used the S, T, SC, and TC names like the jvm spec.
-// https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-6.html#jvms-6.5.instanceof
+// https://docs.oracle.com/javase/specs/jvms/se17/html/jvms-6.html#jvms-6.5.instanceof
 impl JVM {
     pub fn check_class(&mut self, object_desc: &str, class_desc: &str) -> Result<bool, Error> {
         match object_desc.as_bytes()[0] as char {
@@ -582,6 +580,7 @@ impl JVM {
                                 let mut current_class = object_class;
                                 let mut current_class_file = object_class_file;
                                 while current_class.get_class_file().has_super() {
+                                    #[allow(clippy::vtable_address_comparisons)]
                                     if Rc::ptr_eq(&current_class, &class) {
                                         return Ok(true);
                                     }
@@ -595,7 +594,7 @@ impl JVM {
                         }
                     },
                     '[' => Ok(false),
-                    _ => return Err(Error::IllegalDescriptor),
+                    _ => Err(Error::IllegalDescriptor),
                 }
             },
             '[' => {
@@ -630,10 +629,10 @@ impl JVM {
                         }
                         Ok(object_component.as_bytes()[0] == class_component.as_bytes()[0])
                     },
-                    _ => return Err(Error::IllegalDescriptor),
+                    _ => Err(Error::IllegalDescriptor),
                 }
             },
-            _ => return Err(Error::IllegalDescriptor),
+            _ => Err(Error::IllegalDescriptor),
         }
     }   
 }
@@ -662,10 +661,7 @@ impl JVM {
                     Some(c) => c,
                     None => unreachable!(), // Should be unreachable, because methods that don't have code can't have exceptions anyway.
                 };
-                let current_class = frame.rt_const_pool.clone();
-                // We have to drop these references, because it's possible we modify the frame/thread state when resolving classes.
-                drop(frame);
-                drop(thread);
+                let current_class = frame.rt_const_pool.clone();                
                 for ex_handler in &code.exception_table {
                     if (current_pc >= ex_handler.start_pc as usize) && (current_pc < ex_handler.end_pc as usize) {
                         let catches_this = {
@@ -682,6 +678,7 @@ impl JVM {
                                 let mut current_exception_class = exception_class;
                                 let mut ret_flag = false;
                                 while current_exception_class.get_class_file().has_super() {
+                                    #[allow(clippy::vtable_address_comparisons)]
                                     if Rc::ptr_eq(&current_exception_class, &catch_class) {
                                         ret_flag = true;
                                         break;
@@ -714,7 +711,7 @@ impl JVM {
             // If we found no exception handler, pass it down the call chain
             let thread = access_macros::current_thread_mut!(self);
             let _ = thread.m_stack.pop();
-            if thread.m_stack.len() > 0 {
+            if !thread.m_stack.is_empty() {
                 // Continue down the call chain
                 let frame: &mut Frame = access_macros::current_frame_mut!(thread);
                 frame.op_stack.push(exception);
@@ -805,10 +802,10 @@ impl JVM {
         // Fill out the local variables.
         let c_file = c.get_class_file();
         let mut descriptor: &str = c_file.cp_entry(method.descriptor_index)?.as_utf8()?;
-        descriptor = &descriptor[0..descriptor.find(")").unwrap()]; // Skip past the return value
+        descriptor = &descriptor[0..descriptor.find(')').unwrap()]; // Skip past the return value
         descriptor = &descriptor[1..]; // Skip the beginning parenthesis.
         let locals = &mut new_frame.local_variables;
-        while descriptor.len() > 0 {
+        while !descriptor.is_empty() {
             let mut index = descriptor.len() - 1;
             if &descriptor[index..] == ";" {
                 index = descriptor.rfind('L').unwrap();
@@ -916,7 +913,7 @@ impl JVM {
                 "[" => {
                     let val = {
                         // If this code is the method "main", then we have to add the args manually
-                        if thread.m_stack.len() > 0 {
+                        if !thread.m_stack.is_empty() {
                             let current_frame = access_macros::current_frame_mut!(thread);
                         // We could check the class type and make sure it matches up with the expected type, but that's not required by the JVM Spec, so for now we won't
                             match current_frame.op_stack.pop() {
@@ -924,17 +921,15 @@ impl JVM {
                                 None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                             }
                         }
-                        else {
-                            if c.get_class_file().name() != self.m_main_class_name {
+                        else if c.get_class_file().name() != self.m_main_class_name {
                                 panic!();
                             }
-                            else {
-                                // TODO: Add actual arguments.
-                                let args = Array::new_ref(0, String::from("Ljava/lang/String;"));
-                                let args_ref = Reference::Array(Rc::new(args), Rc::new(Monitor::new()));
-                                Value::Reference(args_ref)
-                            }
-                        }
+                        else {
+                            // TODO: Add actual arguments.
+                            let args = Array::new_ref(0, String::from("Ljava/lang/String;"));
+                            let args_ref = Reference::Array(Rc::new(args), Rc::new(Monitor::new()));
+                            Value::Reference(args_ref)
+                        }                        
                     };
                     let inner_value = Value::to_reference(val)?;
                     locals.push(VarValue::Reference(inner_value));
@@ -995,21 +990,10 @@ impl JVM {
     pub fn execute_native(&mut self, method: &MethodInfo, current_class: Rc<dyn Class>) -> Result<(), Error> {
         let current_class_file = current_class.get_class_file();
         let mname = current_class_file.cp_entry(method.name_index)?.as_utf8()?;
-        let mdesc = current_class_file.cp_entry(method.descriptor_index)?.as_utf8()?;
+        let _mdesc = current_class_file.cp_entry(method.descriptor_index)?.as_utf8()?;
         let cname = current_class_file.name();
+        #[allow(clippy::match_single_binding)]
         match cname {
-            "java/lang/String" => {
-                match mname.as_str() {
-                    "intern" => {
-                        // Intern isn't polymorpohic, so we can ignore the descriptor.
-                        // This function is supposed to take a String object, see if we already have one, if we do give a reference to it, 
-                        // if not, give it back and add it to the pool.
-                        // It *should* be fine to just always give the object back.
-                        Ok(())
-                    },
-                    _ => Err(Error::UnsatisfiedLinkError(Opcode::MethodInvoke, mname.clone()))
-                }
-            },
             _ => Err(Error::UnsatisfiedLinkError(Opcode::MethodInvoke, mname.clone()))
         }    
     }
@@ -1035,7 +1019,7 @@ impl JVM {
 }
 
 impl JVM {
-    pub fn parse_descriptor<'a>(desc: &'a String) -> Result<(&'a [&str], &'a str), Error> {
+    pub fn parse_descriptor(_desc: &str) -> Result<(&[&str], &str), Error> {
         panic!("todo");
     }
     pub fn box_primitive_name(&mut self, sym: &str) -> Result<&'static str, Error> {
@@ -1059,28 +1043,26 @@ impl JVM {
         let thread = access_macros::current_thread_mut!(self);
         let frame = access_macros::current_frame_mut!(thread);
         frame.op_stack.push(loader);
-        {
-            if &name[0..1] == "[" {
-                let mut idx = 1;
-                while &name[idx..idx+1] == "[" {
-                    idx += 1;
-                }
-                if &name[idx..idx+1] == "L" {
-                    let comp_name = &name[idx + 1..];
-                    self.gen_class_obj(comp_name)?; // Puts the comp type on the stack
-                }
-                else {
-                    // NOTE: This might be incorrect behavior. 
-                    // It's possible that when we encounter a primitive type, we shouldn't box it into a class
-                    // For now we do, it makes things easier
-                    let boxed_name = self.box_primitive_name(&name[idx..idx+1])?;
-                    self.gen_class_obj(boxed_name)?;
-                }
+        if &name[0..1] == "[" {
+            let mut idx = 1;
+            while &name[idx..idx+1] == "[" {
+                idx += 1;
             }
-            else { 
-                frame.op_stack.push(Value::Reference(Reference::Null));
+            if &name[idx..idx+1] == "L" {
+                let comp_name = &name[idx + 1..];
+                self.gen_class_obj(comp_name)?; // Puts the comp type on the stack
             }
-        };
+            else {
+                // NOTE: This might be incorrect behavior. 
+                // It's possible that when we encounter a primitive type, we shouldn't box it into a class
+                // For now we do, it makes things easier
+                let boxed_name = self.box_primitive_name(&name[idx..idx+1])?;
+                self.gen_class_obj(boxed_name)?;
+            }
+        }
+        else { 
+            frame.op_stack.push(Value::Reference(Reference::Null));
+        }
         // This may not work right, idk how exactly it should work. This will probably need explicit support from the vm in the future.
         let class_class = self.resolve_class_reference("java/lang/Class")?;
         self.setup_method_call_from_name("<init>", "(Ljava/lang/ClassLoader;Ljava/lang/Class;)V", class_class, true)?;

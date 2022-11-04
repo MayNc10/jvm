@@ -1,4 +1,4 @@
-use crate::{class::customclass::CustomClass, errorcodes::Opcode, frame::Frame, access_macros};
+use crate::{errorcodes::Opcode, frame::Frame, access_macros};
 
 use super::super::*;
 
@@ -8,18 +8,18 @@ pub struct String {
 }
 
 impl Object for String {
-    fn new(current_method_class: Option<Rc<dyn Class>>, class_index: Option<u16>, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self: Sized {
+    fn new(_current_method_class: Option<Rc<dyn Class>>, _class_index: Option<u16>, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self: Sized {
         // Once we implement String class, we should use a hashmap and stuff here.
         Ok(Rc::new(String {s: std::string::String::from(""), 
         s_class: jvm.resolve_class_reference("java/lang/String")?}))
     }
-    fn new_with_name(name: &str, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self: Sized {
+    fn new_with_name(_name: &str, _jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self: Sized {
         panic!("No one should ever call String::new_with_name")
     }
-    fn get_field(&self, current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {
+    fn get_field(&self, _current_method_class: Rc<dyn Class>, _class_index: u16, _jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {
         Err(Error::NoSuchFieldError(Opcode::GETFIELD))
     }
-    fn put_field(&mut self, current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM, value: Value<dyn Class, dyn Object>) -> Result<(), Error> {
+    fn put_field(&mut self, _current_method_class: Rc<dyn Class>, _class_index: u16, _jvm: &mut JVM, _value: Value<dyn Class, dyn Object>) -> Result<(), Error> {
         Err(Error::NoSuchFieldError(Opcode::PUTFIELD))
     }
     fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
@@ -43,12 +43,12 @@ impl Object for String {
                     Reference::Array(a, _) => a,
                     _ => return Err(Error::IncorrectReferenceType(Opcode::MethodInvoke)),
                 };
-                let array = unsafe { Rc::get_mut_unchecked(&mut aref) };
+                let _array = unsafe { Rc::get_mut_unchecked(&mut aref) };
                 //if !array.bytea
             },
             _ => {
                 // do funky stuff
-                eprintln!("Use of unimplented function: {}{}", name, desc);
+                eprintln!("Use of unimplented function: {name}{desc}");
                 was_natively_executed = false;
             }
         }

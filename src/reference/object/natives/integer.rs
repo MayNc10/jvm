@@ -1,4 +1,4 @@
-use crate::{access_macros, frame::Frame, thread::Thread, errorcodes::Opcode, class::customclass::CustomClass};
+use crate::{access_macros, frame::Frame, errorcodes::Opcode};
 
 use super::super::*;
 struct Integer {
@@ -8,16 +8,16 @@ struct Integer {
 } 
 
 impl Object for Integer {
-    fn new(current_method_class: Option<Rc<dyn Class>>, class_index: Option<u16>, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self: Sized {
+    fn new(_current_method_class: Option<Rc<dyn Class>>, _class_index: Option<u16>, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error> where Self: Sized {
         Ok(Rc::new(Integer {i: 0, int_class: jvm.resolve_class_reference("java/lang/Integer")?}))
     }
-    fn new_with_name(name: &str, jvm: &mut JVM) -> Result<Rc<dyn Object>, Error>  where Self : Sized {
+    fn new_with_name(_name: &str, _jvm: &mut JVM) -> Result<Rc<dyn Object>, Error>  where Self : Sized {
         panic!("No one should ever call Integer::new_with_name")
     }
-    fn get_field(&self, current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {
+    fn get_field(&self, _current_method_class: Rc<dyn Class>, _class_index: u16, _jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {
         Err(Error::NoSuchFieldError(Opcode::GETFIELD))
     }
-    fn put_field(&mut self, current_method_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM, value: Value<dyn Class, dyn Object>) -> Result<(), Error> {
+    fn put_field(&mut self, _current_method_class: Rc<dyn Class>, _class_index: u16, _jvm: &mut JVM, _value: Value<dyn Class, dyn Object>) -> Result<(), Error> {
         Err(Error::NoSuchFieldError(Opcode::PUTFIELD))
     }
     fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
@@ -46,7 +46,7 @@ impl Object for Integer {
                     Reference::Object(obj, _) => obj,
                     _ => return Err(Error::IncorrectReferenceType(Opcode::MethodInvoke)),
                 };
-                let s = match sobj.as_any().downcast_ref::<super::string::String>() {
+                let _s = match sobj.as_any().downcast_ref::<super::string::String>() {
                     Some(s) => s,
                     None => return Err(Error::IncorrectReferenceType(Opcode::MethodInvoke)), // This might not be the right error.
                 };

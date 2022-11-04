@@ -1,6 +1,5 @@
-use std::{env, fs::{self, File}, io::Read, process::Command, fmt::format, time::Instant};
+use std::{process::Command, time::Instant};
 
-use crate::class::classfile::ClassFile;
 
 pub fn test_chapter(chap: &str, file: &str) {
     let mut s = String::from(".");
@@ -182,6 +181,6 @@ mod speed {
 
     #[test]
     fn factorial() {
-        test_file_timed("speed", "Factorial");
+        test_file_timed("speed", "Primes");
     }
 }

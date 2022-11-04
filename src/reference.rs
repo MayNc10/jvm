@@ -8,8 +8,6 @@ use crate::class::Class;
 use crate::errorcodes::Error;
 use crate::reference::object::Object;
 
-use std::cell::Ref;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use self::object::customobject::CustomObject;
@@ -42,16 +40,19 @@ impl Monitor {
         }
     }
     pub fn try_exit(&mut self, current_thread: usize) -> bool {
-        if self.owned_thread != current_thread {
-            false
-        }
-        else if self.entry_count == 0 {
+        if self.owned_thread != current_thread || self.entry_count == 0  {
             false
         }
         else {
             self.entry_count -= 1;
             true
         }
+    }
+}
+
+impl Default for Monitor {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -117,21 +118,21 @@ impl Reference<dyn Class, dyn Object> {
 
     pub fn ptr_eq(this: &Reference<dyn Class, dyn Object>, other: &Reference<dyn Class, dyn Object>) -> bool {
         match this {
-            Reference::Null => match other {
-                Reference::Null => true,
-                _ => false,
-            },
+            Reference::Null => matches!(other, Reference::Null),
             Reference::Array(a, m) => match other {
-                Reference::Array(a1, m1) => 
+                #[allow(clippy::vtable_address_comparisons)] 
+                Reference::Array(a1, m1) =>            
                     Rc::ptr_eq(a, a1) && Rc::ptr_eq(m, m1),
                 _ => false,
             },
             Reference::Interface(i, m) => match other {
+                #[allow(clippy::vtable_address_comparisons)] 
                 Reference::Interface(i1, m1) => 
                     Rc::ptr_eq(i, i1) && Rc::ptr_eq(m, m1),
                 _ => false,
             },
             Reference::Object(o, m) => match other {
+                #[allow(clippy::vtable_address_comparisons)] 
                 Reference::Object(o1, m1) => 
                 Rc::ptr_eq(o, o1) && Rc::ptr_eq(m, m1),
                 _ => false,
@@ -158,29 +159,23 @@ impl Reference<dyn Class, dyn Object> {
     }
 
     pub fn is_null(&self) -> bool {
-        if let Reference::Null = self {
-            true
-        }
-        else {
-            false
-        }
+        matches!(self, Reference::Null)
     }
     
 }
 
+
 impl PartialEq for Reference<dyn Class, dyn Object> {
     fn eq(&self, other: &Self) -> bool {
         match self {
-            Reference::Null => match other {
-                Reference::Null => true,
-                _ => false,
-            },
+            Reference::Null => matches!(other, Reference::Null),
             Reference::Array(a, m) => match other {
                 Reference::Array(a1, m1) => 
                     a == a1 && Rc::ptr_eq(m, m1),
                 _ => false,
             },
             Reference::Interface(i, m) => match other {
+                #[allow(clippy::vtable_address_comparisons)]
                 Reference::Interface(i1, m1) => 
                     Rc::ptr_eq(i, i1) && Rc::ptr_eq(m, m1),
                 _ => false,
@@ -192,8 +187,11 @@ impl PartialEq for Reference<dyn Class, dyn Object> {
             },
         }
     }
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
+}
+
+impl Default for Reference<dyn Class, dyn Object> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

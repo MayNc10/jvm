@@ -3,10 +3,8 @@ use std::rc::Rc;
 use std::result::Result;
 use std::collections::HashMap;
 
-use crate::{access_macros, class};
-use crate::class::classfile::ClassFile;
 use crate::class::{Class, classfile::*};
-use crate::constant_pool::{NameAndTypeInfo, NameAndType};
+use crate::constant_pool::NameAndType;
 use crate::errorcodes::{Error, Opcode};
 use crate::jvm::JVM;
 use super::object::Object;
@@ -29,7 +27,7 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
         let class_info = cm_class_file.cp_entry(class_index.unwrap())?;
         let name_index = *class_info.as_class()?;
         let name = cm_class_file.cp_entry(name_index)?.as_utf8()?;
-        fn resolve_class_fields<'c ,'d, 'e>(inner_name: &str, jvm: &mut JVM, map: &mut HashMap<NameAndType, Value<dyn Class, dyn Object>>) -> Result<(), Error> {
+        fn resolve_class_fields(inner_name: &str, jvm: &mut JVM, map: &mut HashMap<NameAndType, Value<dyn Class, dyn Object>>) -> Result<(), Error> {
             // We clone the name here, meaning that the name technically could become different from the actual stored name.
             // We just have to be careful to not let this happen.
             let (should_resolve, name) = {
@@ -69,7 +67,7 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
         // This resolution is recursive, because for each class we also have to resolve the fields of its superclasses.
         // To do this, we use this helper function.
         // This function has to use mutable references instead of return values because HashMap has no append function.
-        fn resolve_class_fields<'b>(inner_name: &str, jvm: &mut JVM, map: &mut HashMap<NameAndType, Value<dyn Class, dyn Object>>) -> Result<(), Error> {
+        fn resolve_class_fields(inner_name: &str, jvm: &mut JVM, map: &mut HashMap<NameAndType, Value<dyn Class, dyn Object>>) -> Result<(), Error> {
             // We clone the name here, meaning that the name technically could become different from the actual stored name.
             // We just have to be careful to not let this happen.
             let (should_resolve, name) = {
@@ -115,6 +113,7 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
         // This code is for verifing that the class the field is for is the same as this class. 
         let class_ref = *cm_class_file.cp_entry(field_ref.class_index)?.as_class()?;
         let class_name = cm_class_file.cp_entry(class_ref)?.as_utf8()?;
+        #[allow(clippy::vtable_address_comparisons)]
         if Rc::ptr_eq(&Rc::clone(&self.class).as_dyn_rc(), &jvm.resolve_class_reference(class_name)?) {
             return Err(Error::IncompatibleObjectAndField(String::from(self.class.get_class_file().name()), String::from(class_name)));
         }
@@ -142,6 +141,7 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
         // This code is for verifing that the class the field is for is the same as this class. 
         let class_ref = *cm_class_file.cp_entry(field_ref.class_index)?.as_class()?;
         let class_name = cm_class_file.cp_entry(class_ref)?.as_utf8()?;
+        #[allow(clippy::vtable_address_comparisons)]
         if Rc::ptr_eq(&Rc::clone(&self.class).as_dyn_rc(), &jvm.resolve_class_reference(class_name)?) {
             return Err(Error::IncompatibleObjectAndField(String::from(self.class.get_class_file().name()), String::from(class_name)));
         }
@@ -157,7 +157,7 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
             None => Err(Error::NoSuchFieldError(Opcode::PUTFIELD)),
         }
     }
-    fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
+    fn exec_method(&mut self, _current_method_class: Rc<dyn Class>, _jvm: &mut JVM, _method: &MethodInfo) -> Result<bool, Error> {
         Err(Error::Todo(Opcode::NativeMethod))
     }
     fn class(&self) -> Rc<dyn Class> {

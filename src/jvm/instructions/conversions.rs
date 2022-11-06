@@ -6,7 +6,7 @@ impl Instruction for I2L {
     fn name(&self) -> &'static str {
         "i2l"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -32,7 +32,7 @@ impl Instruction for I2F {
     fn name(&self) -> &'static str {
         "i2f"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -58,7 +58,7 @@ impl Instruction for I2D {
     fn name(&self) -> &'static str {
         "i2d"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -84,7 +84,7 @@ impl Instruction for L2I {
     fn name(&self) -> &'static str {
         "l2i"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -110,7 +110,7 @@ impl Instruction for L2F {
     fn name(&self) -> &'static str {
         "l2f"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -136,7 +136,7 @@ impl Instruction for L2D {
     fn name(&self) -> &'static str {
         "l2d"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -164,7 +164,7 @@ impl Instruction for F2I {
     fn name(&self) -> &'static str {
         "f2i"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -190,7 +190,7 @@ impl Instruction for F2L {
     fn name(&self) -> &'static str {
         "f2l"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -216,7 +216,7 @@ impl Instruction for F2D {
     fn name(&self) -> &'static str {
         "f2d"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {

@@ -2807,7 +2807,7 @@ impl JVM {
                 Some(v) => v,
                 None => return Err(Error::StackUnderflow(Opcode::IFACMPNE)),
             };
-            match val1.as_reference()? != val2.as_reference()? {
+            match !Reference::ptr_eq(&val1.as_reference()?, &val2.as_reference()?) {
                 true => {
                     let bbyte1 = frame.current_method.code()?[pc] as usize;
                     let bbyte2 = frame.current_method.code()?[pc + 1] as usize;
@@ -2858,6 +2858,7 @@ impl JVM {
         Ok(())
     }
     pub fn tableswitch(&mut self) -> Result<(), Error> {
+        //this is just wrong, offsets are isizes.
         let thread = access_macros::current_thread_mut!(self);
         let mut pc = thread.pc() + 1;
         pc += 4 - (pc % 4); // pc has to be a multiple of 4.
@@ -2871,7 +2872,7 @@ impl JVM {
             let default = ((code[pc] as usize) << 24) | ((code[pc + 1] as usize) << 16) | ((code[pc + 2] as usize) << 8) | (code[pc + 3] as usize);
             let low = ((code[pc + 4] as usize) << 24) | ((code[pc + 5] as usize) << 16) | ((code[pc + 6] as usize) << 8) | (code[pc + 7] as usize);
             let high = ((code[pc + 8] as usize) << 24) | ((code[pc + 9] as usize) << 16) | ((code[pc + 10] as usize) << 8) | (code[pc + 11] as usize);
-            let target = match (index < low) | (index > high) {
+            let target = match (index >= low) && (index <= high) {
                 true => index - low,
                 false => default,
             };
@@ -3162,9 +3163,6 @@ impl JVM {
         unsafe {Rc::get_mut_unchecked(&mut class).put_static(name, descriptor, field, self)?; }
         Ok(())
     }
-    // TODO: There is a bug in these two functions that we fixed in the _statics. 
-    // We have to resolve the name and type in the current function, and use string comparisons. 
-    // Check the commit history on the _statics for more info.
     pub fn getfield(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);
         let pc = thread.pc() + 1;
@@ -3856,7 +3854,6 @@ impl JVM {
         let array_ref_val = Value::Reference(array_ref);
         frame.op_stack.push(array_ref_val);
         Ok(())
-        
     }
     pub fn ifnull(&mut self) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(self);

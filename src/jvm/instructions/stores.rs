@@ -8,7 +8,7 @@ impl Instruction for IStore {
     fn name(&self) -> &'static str {
         "istore"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         let idx = if was_wide {
             unsafe {
                 u16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as usize
@@ -42,7 +42,7 @@ impl Instruction for LStore {
     fn name(&self) -> &'static str {
         "lstore"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         let idx = if was_wide {
             unsafe {
                 u16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as usize
@@ -76,7 +76,7 @@ impl Instruction for FStore {
     fn name(&self) -> &'static str {
         "fstore"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         let idx = if was_wide {
             unsafe {
                 u16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as usize
@@ -110,7 +110,7 @@ impl Instruction for DStore {
     fn name(&self) -> &'static str {
         "dstore"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         let idx = if was_wide {
             unsafe {
                 u16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as usize
@@ -144,7 +144,7 @@ impl Instruction for AStore {
     fn name(&self) -> &'static str {
         "astore"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         let idx = if was_wide {
             unsafe {
                 u16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as usize
@@ -176,7 +176,7 @@ impl Instruction for IStore0 {
     fn name(&self) -> &'static str {
         "istore_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -201,7 +201,7 @@ impl Instruction for IStore1 {
     fn name(&self) -> &'static str {
         "istore_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -226,7 +226,7 @@ impl Instruction for IStore2 {
     fn name(&self) -> &'static str {
         "istore_2"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -251,7 +251,7 @@ impl Instruction for IStore3 {
     fn name(&self) -> &'static str {
         "istore_3"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -276,7 +276,7 @@ impl Instruction for LStore0 {
     fn name(&self) -> &'static str {
         "lstore_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -301,7 +301,7 @@ impl Instruction for LStore1 {
     fn name(&self) -> &'static str {
         "lstore_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -326,7 +326,7 @@ impl Instruction for LStore2 {
     fn name(&self) -> &'static str {
         "lstore_2"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -351,7 +351,7 @@ impl Instruction for LStore3 {
     fn name(&self) -> &'static str {
         "lstore_3"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -376,7 +376,7 @@ impl Instruction for FStore0 {
     fn name(&self) -> &'static str {
         "fstore_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -401,7 +401,7 @@ impl Instruction for FStore1 {
     fn name(&self) -> &'static str {
         "fstore_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -426,7 +426,7 @@ impl Instruction for FStore2 {
     fn name(&self) -> &'static str {
         "fstore_2"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -451,7 +451,7 @@ impl Instruction for FStore3 {
     fn name(&self) -> &'static str {
         "fstore_3"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -476,7 +476,7 @@ impl Instruction for DStore0 {
     fn name(&self) -> &'static str {
         "dstore_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -501,7 +501,7 @@ impl Instruction for DStore1 {
     fn name(&self) -> &'static str {
         "dstore_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -526,7 +526,7 @@ impl Instruction for DStore2 {
     fn name(&self) -> &'static str {
         "dstore_2"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -551,7 +551,7 @@ impl Instruction for DStore3 {
     fn name(&self) -> &'static str {
         "dstore_3"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -576,7 +576,7 @@ impl Instruction for AStore0 {
     fn name(&self) -> &'static str {
         "astore_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -601,7 +601,7 @@ impl Instruction for AStore1 {
     fn name(&self) -> &'static str {
         "astore_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -626,7 +626,7 @@ impl Instruction for AStore2 {
     fn name(&self) -> &'static str {
         "astore_2"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -651,7 +651,7 @@ impl Instruction for AStore3 {
     fn name(&self) -> &'static str {
         "astore_3"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -676,7 +676,7 @@ impl Instruction for IAStore {
     fn name(&self) -> &'static str {
         "iastore"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -720,7 +720,7 @@ impl Instruction for LAStore {
     fn name(&self) -> &'static str {
         "lastore"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -764,7 +764,7 @@ impl Instruction for FAStore {
     fn name(&self) -> &'static str {
         "fastore"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -808,7 +808,7 @@ impl Instruction for DAStore {
     fn name(&self) -> &'static str {
         "dastore"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -852,7 +852,7 @@ impl Instruction for AAStore {
     fn name(&self) -> &'static str {
         "aastore"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -896,7 +896,7 @@ impl Instruction for BAStore {
     fn name(&self) -> &'static str {
         "bastore"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -940,7 +940,7 @@ impl Instruction for CAStore {
     fn name(&self) -> &'static str {
         "castore"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -984,7 +984,7 @@ impl Instruction for SAStore {
     fn name(&self) -> &'static str {
         "sastore"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {

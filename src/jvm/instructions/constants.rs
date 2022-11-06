@@ -8,7 +8,7 @@ impl Instruction for Nop {
     fn name(&self) -> &'static str {
         "nop"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(Nop {})
         } else {
@@ -25,7 +25,7 @@ impl Instruction for AConstNull {
     fn name(&self) -> &'static str {
         "aconst_null"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(AConstNull {})
         } else {
@@ -45,7 +45,7 @@ impl Instruction for IConstM1 {
     fn name(&self) -> &'static str {
         "iconst_m1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(IConstM1 {})
         } else {
@@ -65,7 +65,7 @@ impl Instruction for IConst0 {
     fn name(&self) -> &'static str {
         "iconst_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(IConst0 {})
         } else {
@@ -85,7 +85,7 @@ impl Instruction for IConst1 {
     fn name(&self) -> &'static str {
         "iconst_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(IConst1 {})
         } else {
@@ -105,7 +105,7 @@ impl Instruction for IConst2 {
     fn name(&self) -> &'static str {
         "iconst_2"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(IConst2 {})
         } else {
@@ -125,7 +125,7 @@ impl Instruction for IConst3 {
     fn name(&self) -> &'static str {
         "iconst_3"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(IConst3 {})
         } else {
@@ -145,7 +145,7 @@ impl Instruction for IConst4 {
     fn name(&self) -> &'static str {
         "iconst_4"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(IConst4 {})
         } else {
@@ -165,7 +165,7 @@ impl Instruction for IConst5 {
     fn name(&self) -> &'static str {
         "iconst_5"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(IConst5 {})
         } else {
@@ -185,7 +185,7 @@ impl Instruction for LConst0 {
     fn name(&self) -> &'static str {
         "lconst_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(LConst0 {})
         } else {
@@ -205,7 +205,7 @@ impl Instruction for LConst1 {
     fn name(&self) -> &'static str {
         "lconst_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(LConst1 {})
         } else {
@@ -225,7 +225,7 @@ impl Instruction for FConst0 {
     fn name(&self) -> &'static str {
         "fconst_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(FConst0 {})
         } else {
@@ -245,7 +245,7 @@ impl Instruction for FConst1 {
     fn name(&self) -> &'static str {
         "fconst_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(FConst1 {})
         } else {
@@ -265,7 +265,7 @@ impl Instruction for FConst2 {
     fn name(&self) -> &'static str {
         "fconst_2"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(FConst2 {})
         } else {
@@ -285,7 +285,7 @@ impl Instruction for DConst0 {
     fn name(&self) -> &'static str {
         "dconst_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(DConst0 {})
         } else {
@@ -305,7 +305,7 @@ impl Instruction for DConst1 {
     fn name(&self) -> &'static str {
         "dconst_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Ok(DConst1 {})
         } else {
@@ -325,7 +325,7 @@ impl Instruction for BiPush {
     fn name(&self) -> &'static str {
         "bipush"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         let b = v.remove(0);      
         if !was_wide {
             Ok(BiPush { byte: b as i32})
@@ -346,7 +346,7 @@ impl Instruction for SiPush {
     fn name(&self) -> &'static str {
         "sipush"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         let s = unsafe {
             i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())  
         };
@@ -486,7 +486,7 @@ impl Instruction for Ldc<dyn ldc::LDCFunc> {
     fn name(&self) -> &'static str {
         "ldc"
     }
-    fn new(v: &mut Vec<u8>, c: Rc<dyn Class>, jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, c: Rc<dyn Class>, jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         }
@@ -566,7 +566,7 @@ impl Instruction for LdcW<dyn ldc::LDCFunc> {
     fn name(&self) -> &'static str {
         "ldc_w"
     }
-    fn new(v: &mut Vec<u8>, c: Rc<dyn Class>, jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, c: Rc<dyn Class>, jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Err(Error::IllegalWide)
         }
@@ -649,7 +649,7 @@ impl Instruction for Ldc2W<dyn ldc::LDCFunc> {
     fn name(&self) -> &'static str {
         "ldc2_w"
     }
-    fn new(v: &mut Vec<u8>, c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if !was_wide {
             Err(Error::IllegalWide)
         }

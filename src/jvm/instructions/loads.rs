@@ -8,7 +8,7 @@ impl Instruction for ILoad {
     fn name(&self) -> &'static str {
         "iload"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         let idx = if was_wide {
             unsafe {
                 u16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as usize
@@ -39,7 +39,7 @@ impl Instruction for LLoad {
     fn name(&self) -> &'static str {
         "lload"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         let idx = if was_wide {
             unsafe {
                 u16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as usize
@@ -70,7 +70,7 @@ impl Instruction for FLoad {
     fn name(&self) -> &'static str {
         "fload"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         let idx = if was_wide {
             unsafe {
                 u16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as usize
@@ -101,7 +101,7 @@ impl Instruction for DLoad {
     fn name(&self) -> &'static str {
         "dload"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         let idx = if was_wide {
             unsafe {
                 u16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as usize
@@ -132,7 +132,7 @@ impl Instruction for ALoad {
     fn name(&self) -> &'static str {
         "aload"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         let idx = if was_wide {
             unsafe {
                 u16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as usize
@@ -161,7 +161,7 @@ impl Instruction for ILoad0 {
     fn name(&self) -> &'static str {
         "iload_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -183,7 +183,7 @@ impl Instruction for ILoad1 {
     fn name(&self) -> &'static str {
         "iload_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -205,7 +205,7 @@ impl Instruction for ILoad2 {
     fn name(&self) -> &'static str {
         "iload_2"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -227,7 +227,7 @@ impl Instruction for ILoad3 {
     fn name(&self) -> &'static str {
         "iload_3"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -249,7 +249,7 @@ impl Instruction for LLoad0 {
     fn name(&self) -> &'static str {
         "lload_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -271,7 +271,7 @@ impl Instruction for LLoad1 {
     fn name(&self) -> &'static str {
         "lload_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -293,7 +293,7 @@ impl Instruction for LLoad2 {
     fn name(&self) -> &'static str {
         "lload_2"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -315,7 +315,7 @@ impl Instruction for LLoad3 {
     fn name(&self) -> &'static str {
         "lload_3"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -337,7 +337,7 @@ impl Instruction for FLoad0 {
     fn name(&self) -> &'static str {
         "fload_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -359,7 +359,7 @@ impl Instruction for FLoad1 {
     fn name(&self) -> &'static str {
         "fload_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -381,7 +381,7 @@ impl Instruction for FLoad2 {
     fn name(&self) -> &'static str {
         "fload_2"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -403,7 +403,7 @@ impl Instruction for FLoad3 {
     fn name(&self) -> &'static str {
         "fload_3"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -425,7 +425,7 @@ impl Instruction for DLoad0 {
     fn name(&self) -> &'static str {
         "dload_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -447,7 +447,7 @@ impl Instruction for DLoad1 {
     fn name(&self) -> &'static str {
         "dload_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -469,7 +469,7 @@ impl Instruction for DLoad2 {
     fn name(&self) -> &'static str {
         "dload_2"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -491,7 +491,7 @@ impl Instruction for DLoad3 {
     fn name(&self) -> &'static str {
         "dload_3"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -513,7 +513,7 @@ impl Instruction for ALoad0 {
     fn name(&self) -> &'static str {
         "aload_0"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -535,7 +535,7 @@ impl Instruction for ALoad1 {
     fn name(&self) -> &'static str {
         "aload_1"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -557,7 +557,7 @@ impl Instruction for ALoad2 {
     fn name(&self) -> &'static str {
         "aload_2"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -579,7 +579,7 @@ impl Instruction for ALoad3 {
     fn name(&self) -> &'static str {
         "aload_3"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -601,7 +601,7 @@ impl Instruction for IALoad {
     fn name(&self) -> &'static str {
         "iaload"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -639,7 +639,7 @@ impl Instruction for LALoad {
     fn name(&self) -> &'static str {
         "laload"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -677,7 +677,7 @@ impl Instruction for FALoad {
     fn name(&self) -> &'static str {
         "faload"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -715,7 +715,7 @@ impl Instruction for DALoad {
     fn name(&self) -> &'static str {
         "daload"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -753,7 +753,7 @@ impl Instruction for AALoad {
     fn name(&self) -> &'static str {
         "aaload"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -791,7 +791,7 @@ impl Instruction for BALoad {
     fn name(&self) -> &'static str {
         "baload"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -829,7 +829,7 @@ impl Instruction for CALoad {
     fn name(&self) -> &'static str {
         "caload"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -867,7 +867,7 @@ impl Instruction for SALoad {
     fn name(&self) -> &'static str {
         "saload"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {

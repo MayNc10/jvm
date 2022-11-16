@@ -1,14 +1,28 @@
 use std::any::Any;
+use std::ptr::NonNull;
 use std::rc::Rc;
 use std::result::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map};
 
 use crate::class::{Class, classfile::*};
 use crate::constant_pool::NameAndType;
 use crate::errorcodes::{Error, Opcode};
 use crate::jvm::JVM;
 use super::object::Object;
-use crate::value::Value;
+use crate::value::{Value, ValueMarker};
+
+// Allows for future work to remove HashMap access
+struct Shape {
+    mem: Box<u8>,
+    layout: HashMap<NameAndType, (usize, ValueMarker)>
+}
+
+impl Shape {
+    pub fn new(map: &HashMap<NameAndType, Value<dyn Class, dyn Object>>) -> Shape {
+
+    }
+}
+
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct CustomObject<C> 

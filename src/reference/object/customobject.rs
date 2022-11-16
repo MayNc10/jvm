@@ -1,14 +1,44 @@
 use std::any::Any;
+use std::ptr::slice_from_raw_parts;
 use std::rc::Rc;
 use std::result::Result;
 use std::collections::HashMap;
 
 use crate::class::{Class, classfile::*};
 use crate::constant_pool::NameAndType;
+use crate::data_access;
 use crate::errorcodes::{Error, Opcode};
 use crate::jvm::JVM;
 use super::object::Object;
-use crate::value::Value;
+use crate::value::{Value, ValueMarker};
+
+// Allows for future work to remove HashMap access
+// TODO: COMPRESS 
+/* struct Shape {
+    mem: Box<[u8]>,
+    layout: HashMap<NameAndType, (usize, ValueMarker)>
+}
+
+impl Shape {
+    pub fn new(map: &mut Vec<(NameAndType, Value<dyn Class, dyn Object>)>) -> Shape {
+        map.sort_by(|(_, v), (_, other)| 
+            ValueMarker::from(v).unwrap().cmp(&ValueMarker::from(other).unwrap()));
+        /*let alloc_size = map.iter().fold(0_usize, |acc, (_, v)| 
+            acc + ValueMarker::from(v).unwrap().size() as usize); */
+        let alloc_size = map.len() * 8;   
+        let mem = data_access::alloc_box_buffer::<Value<dyn Class, dyn Object>>(alloc_size);
+        let mut offset = 0;
+        let mut layout = HashMap::new();
+        for (nty, val) in map {
+            layout.insert(nty.clone(), (offset, ValueMarker::from(val).unwrap()));
+            offset += 8
+            // init box
+        }   
+        Shape { mem, layout }
+    }
+    pub fn get(&self, var: NameAndType) -> Value
+}
+*/
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct CustomObject<C> 
@@ -175,4 +205,8 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
             Some(other) => self.instance_vars == other.instance_vars && Rc::ptr_eq(&self.class, &other.class) ,
         }
     }
+}
+
+impl CustomObject<dyn Class> {
+
 }

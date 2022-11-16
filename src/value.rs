@@ -7,12 +7,85 @@
 // Idea: Consider using alloc::borrow::Cow to keep stack values.
 // https://doc.rust-lang.org/nightly/alloc/borrow/enum.Cow.html
 use std::fmt;
+use std::mem::size_of;
 use std::result::Result;
 
 use crate::class::Class;
 use crate::errorcodes::Error;
-use crate::reference;
+use crate::reference::{self, Reference};
 use crate::reference::object::Object;
+
+use inkwell::AddressSpace;
+use inkwell::builder::Builder;
+use inkwell::context::Context;
+use inkwell::execution_engine::{ExecutionEngine, JitFunction};
+use inkwell::module::Module;
+use inkwell::types::BasicTypeEnum;
+
+#[repr(u8)]
+#[derive(Eq, PartialEq)]
+pub enum ValueMarker {
+    Byte,
+    Short,
+    Int,
+    Long,
+    Char,
+    Float,
+    Double,
+    Reference,
+}
+
+impl ValueMarker {
+    pub fn from(val: &Value<dyn Class, dyn Object>) -> Result<ValueMarker, Error> {
+        match val {
+            Value::Byte(_) => Ok(Self::Byte),
+            Value::Short(_) => Ok(Self::Short),
+            Value::Int(_) => Ok(Self::Int),
+            Value::Long(_) => Ok(Self::Long),
+            Value::Char(_) => Ok(Self::Char),
+            Value::Float(_) => Ok(Self::Float),
+            Value::Double(_) => Ok(Self::Double),
+            Value::Reference(_) => Ok(Self::Reference),
+            Value::ReturnAddress(_) => Err(Error::IllegalDescriptor) // Make a new error
+        }
+    }
+    pub fn size(&self) -> u8 {
+        match self {
+            Self::Byte => size_of::<u8>() as u8,
+            Self::Short => size_of::<u16>() as u8,
+            Self::Int => size_of::<i32>() as u8,
+            Self::Long => size_of::<i64>() as u8,
+            Self::Char => size_of::<u16>() as u8,
+            Self::Float => size_of::<f32>() as u8,
+            Self::Double => size_of::<f64>() as u8,
+            Self::Reference => size_of::<Reference<dyn Class, dyn Object>>() as u8,
+        }
+    }
+    pub fn llvm_type<'a>(&'a self, ctx: &'static Context) -> BasicTypeEnum<'static> {
+        match self {
+            Self::Byte => BasicTypeEnum::IntType(ctx.i8_type()),
+            Self::Short => BasicTypeEnum::IntType(ctx.i16_type()),
+            Self::Int => BasicTypeEnum::IntType(ctx.i32_type()),
+            Self::Long => BasicTypeEnum::IntType(ctx.i64_type()),
+            Self::Char => BasicTypeEnum::IntType(ctx.i16_type()),
+            Self::Float => BasicTypeEnum::FloatType(ctx.f32_type()),
+            Self::Double => BasicTypeEnum::FloatType(ctx.f64_type()),
+            Self::Reference => BasicTypeEnum::PointerType(ctx.i128_type().ptr_type(AddressSpace::Generic)), // For alignment
+        }
+    }
+}
+
+impl PartialOrd for ValueMarker {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.size().partial_cmp(&other.size())
+    }
+}
+
+impl Ord for ValueMarker {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.size().cmp(&other.size())
+    }
+}
 
 #[derive(PartialEq)]
 pub enum Value<C: Class + ?Sized, O: Object + ?Sized> {

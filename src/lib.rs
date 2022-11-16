@@ -4,6 +4,7 @@
 // We could also check beforehand, but this works simpler (even though it's experimental).
 #![feature(let_chains)] // We use this to chain let comparisons, which makes our code look cleaner
 #![feature(downcast_unchecked)] // Used for downcasting to native objects.
+#![feature(allocator_api, ptr_internals)]
 
 #[macro_use] pub mod access_macros;
 pub mod argsparser;
@@ -18,6 +19,7 @@ pub mod attributes;
 pub mod constant_pool;
 pub mod flags;
 pub mod reference;
+pub mod safebox;
 
 #[cfg(test)]
 pub mod testing;

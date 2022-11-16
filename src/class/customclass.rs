@@ -1,3 +1,10 @@
+use inkwell::OptimizationLevel;
+use inkwell::builder::Builder;
+use inkwell::context::Context;
+use inkwell::execution_engine::{ExecutionEngine, JitFunction};
+use inkwell::module::Module;
+use inkwell::types::{BasicType, BasicMetadataTypeEnum};
+
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{constant_pool::{NameAndType, Entry}, value::{Value, VarValue}, errorcodes::Opcode, flags, reference::{Reference, array::Array, Monitor}, access_macros, frame::Frame};
@@ -7,11 +14,15 @@ use super::*;
 pub struct CustomClass {
     class_file: Rc<classfile::ClassFile>,
     static_fields: HashMap<NameAndType, Rc<Value<dyn Class, dyn Object>>>, 
+    context: &'static Context,
+    module: Module<'static>,
+    builder: Builder<'static>,
+    execution_engine: ExecutionEngine<'static>,
 }
 
 impl Class for CustomClass {
     // We could use a different type than NameAndType for the &Strings, but this is simpler and terribly slow.
-    fn new(file: classfile::ClassFile, _jvm: &mut JVM) -> Result<Self, Error> where Self : Sized {
+    fn new(file: classfile::ClassFile, jvm: &mut JVM) -> Result<Self, Error> where Self : Sized {
         let mut static_fields = HashMap::new();
         // Fill in static fields.
         for field in &file.fields {
@@ -61,7 +72,27 @@ impl Class for CustomClass {
                 static_fields.insert(name_and_type, Rc::new(value));
             }
         }
-        Ok(CustomClass { class_file: Rc::new(file), static_fields })
+        let module = jvm.context.create_module(file.name());
+        let builder = jvm.context.create_builder();
+        let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None).unwrap();
+
+        let mut class = CustomClass { class_file: Rc::new(file), static_fields, context: jvm.context, module, builder, execution_engine};
+
+        if jvm.should_always_jit {
+            for method in &class.get_class_file().methods {
+                let mut can_jit = true;
+
+                for op in method.code().unwrap() {
+                    can_jit &= op.can_jit();
+                }
+
+                if can_jit {
+                    class.codegen_fn(jvm, method);
+                }
+            } 
+        }
+
+        Ok(class)
     }
     fn get_static(&self, name: &str, descriptor: &str, jvm: &mut JVM) -> Result<Value<dyn Class, dyn Object>, Error> {
         let name_and_type = NameAndType { name: String::from(name), descriptor: String::from(descriptor) };
@@ -146,6 +177,7 @@ impl Class for CustomClass {
         let mut new_frame = Frame::new(self.clone(), method.clone());
         // Fill out the local variables.
         let c_file = self.get_class_file();
+        // Use jvm::parse_descriptor
         let mut descriptor: &str = c_file.cp_entry(method.descriptor_index)?.as_utf8()?;
         descriptor = &descriptor[0..descriptor.find(')').unwrap()]; // Skip past the return value
         descriptor = &descriptor[1..]; // Skip the beginning parenthesis.
@@ -298,6 +330,33 @@ impl Class for CustomClass {
     }
     fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any> {
         self
+    }
+}
+
+impl CustomClass {
+    fn codegen_fn(&mut self, jvm: &mut JVM, method: &MethodInfo) {
+        // Maybe put this verification pass somewhere else
+        let mut can_jit = true;
+        for op in method.code().unwrap() {
+            can_jit &= op.can_jit();
+        }
+        assert!(can_jit);
+
+        let c_file = self.get_class_file();
+        let mut fname = String::from(c_file.cp_entry(method.name_index).unwrap().as_utf8().unwrap());
+        fname.push_str(c_file.cp_entry(method.descriptor_index).unwrap().as_utf8().unwrap());
+        let (args, ret) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index).
+            unwrap().as_utf8().unwrap()).unwrap();
+        let fn_type = ret.llvm_type(self.context).fn_type(
+            args.into_iter().map(|t| t.llvm_type(self.context).into()).collect::<Vec<BasicMetadataTypeEnum>>().as_slice(), false);
+        let function = self.module.add_function(fname.as_str(), fn_type, None);
+        let basic_block = self.context.append_basic_block(function, "entry");
+        self.builder.position_at_end(basic_block);
+        
+
+        for op in method.code().unwrap() {
+            op.jit(self.context, &self.module, &self.builder, &self.execution_engine, &fname, function);
+        }
     }
 }
 

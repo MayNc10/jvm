@@ -6,9 +6,12 @@ use crate::class::{Class, classfile::MethodInfo};
 use crate::frame::Frame;
 use crate::reference::{Reference, Monitor};
 use crate::thread::Thread;
-use crate::value::{Value, VarValue};
+use crate::value::{Value, VarValue, ValueMarker};
 
 use core::panic;
+
+use inkwell::context::Context;
+
 use std::collections::HashMap;
 use std::fs::{File, self};
 use std::io::Read;
@@ -46,10 +49,12 @@ pub struct JVM {
     m_flags: u8,
     pub start_time: Instant,
     class_path: Option<String>,
+    pub context: &'static Context,
+    pub should_always_jit: bool,
 }
 
 impl JVM {
-    pub fn new_jvm(n: String, flags: u8, class_path: Option<String>) -> JVM {
+    pub fn new_jvm(n: String, flags: u8, class_path: Option<String>, context: &'static Context) -> JVM {
         JVM {
             m_threads: vec![Thread::new()
             ],
@@ -65,9 +70,11 @@ impl JVM {
             m_flags: flags,
             start_time: Instant::now(),
             class_path,
+            context,
+            should_always_jit:  false,
         }
     }
-    pub fn new_with_step_size(n: String, step_size: usize, flags: u8, class_path: Option<String>) -> JVM {
+    pub fn new_with_step_size(n: String, step_size: usize, flags: u8, class_path: Option<String>, context: &'static Context) -> JVM {
         JVM {
             m_threads: Vec::new(),
             m_loaded_classes: HashMap::new(),
@@ -82,10 +89,12 @@ impl JVM {
             m_flags: flags,
             start_time: Instant::now(),
             class_path,
+            context,
+            should_always_jit:  false,
         }
     }
-    pub fn new_with_main_class(c: ClassFile, code_bytes: Vec<Vec<u8>>, flags: u8, class_path: Option<String>) -> Result<JVM, Error> {
-        let mut jvm = Self::new_jvm(String::from(c.name()), flags, class_path);
+    pub fn new_with_main_class(c: ClassFile, code_bytes: Vec<Vec<u8>>, flags: u8, class_path: Option<String>, context: &'static Context) -> Result<JVM, Error> {
+        let mut jvm = Self::new_jvm(String::from(c.name()), flags, class_path, context);
 
         let name = String::from(c.name());
         let class = class::new_class(c, &mut jvm)?;
@@ -1062,8 +1071,45 @@ impl JVM {
 }
 
 impl JVM {
-    pub fn parse_descriptor(_desc: &str) -> Result<(&[&str], &str), Error> {
-        panic!("todo");
+    pub fn parse_descriptor(mut desc: &str) -> Result<(Box<[ValueMarker]>, ValueMarker), Error> {
+        let ret_val = match &desc[desc.find(')').unwrap()..desc.find(')').unwrap() + 1] {
+            "B" | "Z"=> ValueMarker::Byte,
+            "C" => ValueMarker::Char,
+            "D" => ValueMarker::Double,
+            "F" => ValueMarker::Float,
+            "I" => ValueMarker::Int,
+            "J" => ValueMarker::Long,
+            "S" => ValueMarker::Short,
+            "L" | "[" => ValueMarker::Reference,
+            _ => return Err(Error::IllegalDescriptor),
+        };
+
+        desc = &desc[0..desc.find(')').unwrap()]; // Skip past the return value
+        desc = &desc[1..]; // Skip the beginning parenthesis.
+        let mut args = Vec::new();
+        while !desc.is_empty() {
+            let mut index = desc.len() - 1;
+            if &desc[index..] == ";" {
+                index = desc.rfind('L').unwrap();
+            }
+            if (index > 0) && &desc[index - 1..index] == "[" {
+                // There is a better way of doing this, FIXME.
+                desc = &desc[..index];
+                index -= 1;
+            }
+            args.push(match &desc[index..index + 1] {
+                "B" | "Z"=> ValueMarker::Byte,
+                "C" => ValueMarker::Char,
+                "D" => ValueMarker::Double,
+                "F" => ValueMarker::Float,
+                "I" => ValueMarker::Int,
+                "J" => ValueMarker::Long,
+                "S" => ValueMarker::Short,
+                "L" | "[" => ValueMarker::Reference,
+                _ => return Err(Error::IllegalDescriptor),
+            })
+        }
+        Ok((args.into_boxed_slice(), ret_val))
     }
     pub fn box_primitive_name(&mut self, sym: &str) -> Result<&'static str, Error> {
         match sym {

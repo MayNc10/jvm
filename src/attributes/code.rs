@@ -51,6 +51,23 @@ pub mod stack_map_table {
         AppendFrame(u8, u16, Vec<VerificationTypeInfo>),
         FullFrame(u16, Vec<VerificationTypeInfo>, Vec<VerificationTypeInfo>),
     }
+
+    pub fn local_var_layout(map: &Vec<StackMapFrame>) -> Vec<VerificationTypeInfo> {
+        let mut uncompressed_map: Vec<Vec<VerificationTypeInfo>> = Vec::new();
+        for frame in map {
+            match frame {
+                StackMapFrame::SameFrame(_) | StackMapFrame::SameFrameExtended(_) | 
+                StackMapFrame::SameLocals1StackItem(_, _) | StackMapFrame::SameLocals1StackItemExtended(_, _)
+                 => uncompressed_map.push(uncompressed_map.last().unwrap().clone()),
+                StackMapFrame::ChopFrame(ftype, _) => {
+                    let last_map = uncompressed_map.last().unwrap();
+                    uncompressed_map.push(last_map[0..last_map.len() - (251 - ftype) as usize].into())
+                },
+                StackMapFrame::AppendFrame(, , )
+            }
+        }
+        todo!("local var layout");
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -16,3 +16,6 @@ debug = true
 [dependencies]
 paste = "1.0.9"
 dyn-clone = "1.0.9"
+inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm12-0"] }
+send_wrapper = "0.6.0"
+once_cell = "1.16.0"

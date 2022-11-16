@@ -12,6 +12,11 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use dyn_clone::*;
+use inkwell::builder::Builder;
+use inkwell::context::Context;
+use inkwell::execution_engine::{ExecutionEngine, JitFunction};
+use inkwell::module::Module;
+use inkwell::values::FunctionValue;
 
 pub mod constants;
 pub mod loads;
@@ -45,6 +50,13 @@ pub trait Instruction : core::fmt::Debug + DynClone {
     fn compress_range(&mut self, _this_pc: usize, _translation_map: &HashMap<usize, usize>) {}
     fn as_any(&self) -> &dyn Any;
     fn eq(&self, other: &dyn Instruction) -> bool;
+
+    fn can_jit(&self) -> bool {false}
+    // A very basic jit outline, without support for control flow. 
+    fn jit(&self, context: &'static Context, module: &Module<'static>, builder: &Builder<'static>, 
+            engine: &ExecutionEngine<'static>, name: &String, func: FunctionValue) {
+        panic!("Attempted to jit a non-jitable instruction");
+    }
 }
 
 impl std::fmt::Display for dyn Instruction {

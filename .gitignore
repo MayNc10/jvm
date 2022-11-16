@@ -5,3 +5,7 @@
 *.classpath
 *.project
 *.java
+*.svg
+*.data
+*.data.old
+

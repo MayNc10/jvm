@@ -1,3 +1,5 @@
+/* 
+
 use std::result::Result;use std::rc::Rc;
 
 use crate::class::Class;
@@ -13,6 +15,8 @@ use crate::{access_macros, flags};
 
 // TODO: Rework actual JVM Exceptions to push an object instead of just returning an error.
 // TODO: Use op_stack.last() instead of indexing. 
+
+
 
 impl JVM {
     // Constants
@@ -3935,3 +3939,5 @@ impl JVM {
         Err(Error::ImpDep2)
     }
 }
+
+*/

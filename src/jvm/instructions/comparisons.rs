@@ -1,13 +1,13 @@
 use super::*;
 use crate::compress_addr;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LCmp {}
 impl Instruction for LCmp {
     fn name(&self) -> &'static str {
         "lcmp"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -35,15 +35,24 @@ impl Instruction for LCmp {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<LCmp>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FCmpL {}
 impl Instruction for FCmpL {
     fn name(&self) -> &'static str {
         "fcmpl"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -73,15 +82,24 @@ impl Instruction for FCmpL {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<FCmpL>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FCmpG {}
 impl Instruction for FCmpG {
     fn name(&self) -> &'static str {
         "fcmpg"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -111,15 +129,24 @@ impl Instruction for FCmpG {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DCmpL {}
 impl Instruction for DCmpL {
     fn name(&self) -> &'static str {
         "dcmpl"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -149,15 +176,24 @@ impl Instruction for DCmpL {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DcmpG {}
 impl Instruction for DcmpG {
     fn name(&self) -> &'static str {
         "dcmpg"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -187,9 +223,18 @@ impl Instruction for DcmpG {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfEq {
     offset: isize,
 }
@@ -197,13 +242,14 @@ impl Instruction for IfEq {
     fn name(&self) -> &'static str {
         "ifeq"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfEq {offset})
         }
     }
@@ -224,9 +270,18 @@ impl Instruction for IfEq {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfNe {
     offset: isize,
 }
@@ -234,13 +289,14 @@ impl Instruction for IfNe {
     fn name(&self) -> &'static str {
         "ifne"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfNe {offset})
         }
     }
@@ -261,9 +317,18 @@ impl Instruction for IfNe {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfLt {
     offset: isize,
 }
@@ -271,13 +336,14 @@ impl Instruction for IfLt {
     fn name(&self) -> &'static str {
         "iflt"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfLt {offset})
         }
     }
@@ -298,9 +364,18 @@ impl Instruction for IfLt {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfGe {
     offset: isize,
 }
@@ -308,13 +383,14 @@ impl Instruction for IfGe {
     fn name(&self) -> &'static str {
         "ifge"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfGe {offset})
         }
     }
@@ -335,9 +411,18 @@ impl Instruction for IfGe {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfGt {
     offset: isize,
 }
@@ -345,13 +430,14 @@ impl Instruction for IfGt {
     fn name(&self) -> &'static str {
         "ifgt"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfGt {offset})
         }
     }
@@ -372,9 +458,18 @@ impl Instruction for IfGt {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfLe {
     offset: isize,
 }
@@ -382,13 +477,14 @@ impl Instruction for IfLe {
     fn name(&self) -> &'static str {
         "ifle"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfLe {offset})
         }
     }
@@ -409,9 +505,18 @@ impl Instruction for IfLe {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfICmpEq {
     offset: isize,
 }
@@ -419,13 +524,14 @@ impl Instruction for IfICmpEq {
     fn name(&self) -> &'static str {
         "if_icmpeq"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfICmpEq {offset})
         }
     }
@@ -450,9 +556,18 @@ impl Instruction for IfICmpEq {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfICmpNe {
     offset: isize,
 }
@@ -460,13 +575,14 @@ impl Instruction for IfICmpNe {
     fn name(&self) -> &'static str {
         "if_icmpne"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfICmpNe {offset})
         }
     }
@@ -491,9 +607,18 @@ impl Instruction for IfICmpNe {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfICmpLt {
     offset: isize,
 }
@@ -501,13 +626,14 @@ impl Instruction for IfICmpLt {
     fn name(&self) -> &'static str {
         "if_icmplt"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfICmpLt {offset})
         }
     }
@@ -532,9 +658,18 @@ impl Instruction for IfICmpLt {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfICmpGe {
     offset: isize,
 }
@@ -542,13 +677,14 @@ impl Instruction for IfICmpGe {
     fn name(&self) -> &'static str {
         "if_icmpge"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfICmpGe {offset})
         }
     }
@@ -573,9 +709,18 @@ impl Instruction for IfICmpGe {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfICmpGt {
     offset: isize,
 }
@@ -583,13 +728,14 @@ impl Instruction for IfICmpGt {
     fn name(&self) -> &'static str {
         "if_icmpgt"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfICmpGt {offset})
         }
     }
@@ -605,18 +751,27 @@ impl Instruction for IfICmpGt {
                 Some(v) => v,
                 None => return Err(Error::StackUnderflow(Opcode::IFICMPGT)),
             };
-            match val1.as_int()? >= val2.as_int()? {
+            match val1.as_int()? > val2.as_int()? {
                 true => self.offset,
-                false => 1,
+                false => 0,
             }
         };
         thread.inc_pc(offset)?;
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfICmpLe {
     offset: isize,
 }
@@ -624,13 +779,14 @@ impl Instruction for IfICmpLe {
     fn name(&self) -> &'static str {
         "if_icmple"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfICmpLe {offset})
         }
     }
@@ -655,9 +811,18 @@ impl Instruction for IfICmpLe {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfACmpEq {
     offset: isize,
 }
@@ -665,13 +830,14 @@ impl Instruction for IfACmpEq {
     fn name(&self) -> &'static str {
         "if_acmpeq"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfACmpEq {offset})
         }
     }
@@ -696,9 +862,18 @@ impl Instruction for IfACmpEq {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfACmpNe {
     offset: isize,
 }
@@ -706,13 +881,14 @@ impl Instruction for IfACmpNe {
     fn name(&self) -> &'static str {
         "if_acmpne"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
+            v.remove(0); v.remove(0);
             Ok(IfACmpNe {offset})
         }
     }
@@ -737,4 +913,13 @@ impl Instruction for IfACmpNe {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }

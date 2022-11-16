@@ -1,12 +1,12 @@
 use super::*;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IAdd {}
 impl Instruction for IAdd {
     fn name(&self) -> &'static str {
         "iadd"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -28,15 +28,24 @@ impl Instruction for IAdd {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LAdd {}
 impl Instruction for LAdd {
     fn name(&self) -> &'static str {
         "ladd"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -58,15 +67,24 @@ impl Instruction for LAdd {
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FAdd {}
 impl Instruction for FAdd {
     fn name(&self) -> &'static str {
         "fadd"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -88,15 +106,24 @@ impl Instruction for FAdd {
         frame.op_stack.push(Value::Float(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DAdd {}
 impl Instruction for DAdd {
     fn name(&self) -> &'static str {
         "dadd"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -118,15 +145,24 @@ impl Instruction for DAdd {
         frame.op_stack.push(Value::Double(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ISub {}
 impl Instruction for ISub {
     fn name(&self) -> &'static str {
         "isub"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -148,15 +184,24 @@ impl Instruction for ISub {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LSub {}
 impl Instruction for LSub {
     fn name(&self) -> &'static str {
         "lsub"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -178,15 +223,24 @@ impl Instruction for LSub {
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FSub {}
 impl Instruction for FSub {
     fn name(&self) -> &'static str {
         "fsub"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -208,15 +262,24 @@ impl Instruction for FSub {
         frame.op_stack.push(Value::Float(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DSub {}
 impl Instruction for DSub {
     fn name(&self) -> &'static str {
         "dsub"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -238,15 +301,24 @@ impl Instruction for DSub {
         frame.op_stack.push(Value::Double(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IMul {}
 impl Instruction for IMul {
     fn name(&self) -> &'static str {
         "imul"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -268,15 +340,24 @@ impl Instruction for IMul {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LMul {}
 impl Instruction for LMul {
     fn name(&self) -> &'static str {
         "lmul"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -298,15 +379,24 @@ impl Instruction for LMul {
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FMul {}
 impl Instruction for FMul {
     fn name(&self) -> &'static str {
         "fmul"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -328,15 +418,24 @@ impl Instruction for FMul {
         frame.op_stack.push(Value::Float(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DMul {}
 impl Instruction for DMul {
     fn name(&self) -> &'static str {
         "dmul"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -358,15 +457,24 @@ impl Instruction for DMul {
         frame.op_stack.push(Value::Double(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IDiv {}
 impl Instruction for IDiv {
     fn name(&self) -> &'static str {
         "idiv"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -391,15 +499,24 @@ impl Instruction for IDiv {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LDiv {}
 impl Instruction for LDiv {
     fn name(&self) -> &'static str {
         "ldiv"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -424,15 +541,24 @@ impl Instruction for LDiv {
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FDiv {}
 impl Instruction for FDiv {
     fn name(&self) -> &'static str {
         "fdiv"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -454,15 +580,24 @@ impl Instruction for FDiv {
         frame.op_stack.push(Value::Float(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DDiv {}
 impl Instruction for DDiv {
     fn name(&self) -> &'static str {
         "ddiv"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -484,15 +619,24 @@ impl Instruction for DDiv {
         frame.op_stack.push(Value::Double(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IRem {}
 impl Instruction for IRem {
     fn name(&self) -> &'static str {
         "irem"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -517,15 +661,24 @@ impl Instruction for IRem {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LRem {}
 impl Instruction for LRem {
     fn name(&self) -> &'static str {
         "lrem"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -550,15 +703,24 @@ impl Instruction for LRem {
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FRem {}
 impl Instruction for FRem {
     fn name(&self) -> &'static str {
         "frem"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -580,15 +742,24 @@ impl Instruction for FRem {
         frame.op_stack.push(Value::Float(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DRem {}
 impl Instruction for DRem {
     fn name(&self) -> &'static str {
         "drem"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -610,15 +781,24 @@ impl Instruction for DRem {
         frame.op_stack.push(Value::Double(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct INeg {}
 impl Instruction for INeg {
     fn name(&self) -> &'static str {
         "ineg"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -636,15 +816,24 @@ impl Instruction for INeg {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LNeg {}
 impl Instruction for LNeg {
     fn name(&self) -> &'static str {
         "lneg"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -662,15 +851,24 @@ impl Instruction for LNeg {
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FNeg {}
 impl Instruction for FNeg {
     fn name(&self) -> &'static str {
         "fneg"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -688,15 +886,24 @@ impl Instruction for FNeg {
         frame.op_stack.push(Value::Float(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DNeg {}
 impl Instruction for DNeg {
     fn name(&self) -> &'static str {
         "dneg"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -714,15 +921,24 @@ impl Instruction for DNeg {
         frame.op_stack.push(Value::Double(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IShl {}
 impl Instruction for IShl {
     fn name(&self) -> &'static str {
         "ishl"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -744,15 +960,24 @@ impl Instruction for IShl {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LShl {}
 impl Instruction for LShl {
     fn name(&self) -> &'static str {
         "lshl"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -774,15 +999,24 @@ impl Instruction for LShl {
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IShr {}
 impl Instruction for IShr {
     fn name(&self) -> &'static str {
         "ishr"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -804,15 +1038,24 @@ impl Instruction for IShr {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LShr {}
 impl Instruction for LShr {
     fn name(&self) -> &'static str {
         "lshr"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -834,15 +1077,24 @@ impl Instruction for LShr {
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IUshr {}
 impl Instruction for IUshr {
     fn name(&self) -> &'static str {
         "iushr"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -869,15 +1121,24 @@ impl Instruction for IUshr {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LUshr {}
 impl Instruction for LUshr {
     fn name(&self) -> &'static str {
         "lushr"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -904,15 +1165,24 @@ impl Instruction for LUshr {
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IAnd {}
 impl Instruction for IAnd {
     fn name(&self) -> &'static str {
         "iand"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -934,15 +1204,24 @@ impl Instruction for IAnd {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LAnd {}
 impl Instruction for LAnd {
     fn name(&self) -> &'static str {
         "land"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -964,15 +1243,24 @@ impl Instruction for LAnd {
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IOr {}
 impl Instruction for IOr {
     fn name(&self) -> &'static str {
         "ior"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -994,15 +1282,24 @@ impl Instruction for IOr {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LOr {}
 impl Instruction for LOr {
     fn name(&self) -> &'static str {
         "lor"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -1024,15 +1321,24 @@ impl Instruction for LOr {
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IXor {}
 impl Instruction for IXor {
     fn name(&self) -> &'static str {
         "ixor"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -1054,15 +1360,24 @@ impl Instruction for IXor {
         frame.op_stack.push(Value::Int(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LXor {}
 impl Instruction for LXor {
     fn name(&self) -> &'static str {
         "lxor"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -1084,9 +1399,18 @@ impl Instruction for LXor {
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IInc {
     index: usize,
     const_incr: i32,
@@ -1095,7 +1419,7 @@ impl Instruction for IInc {
     fn name(&self) -> &'static str {
         "iinc"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -1113,5 +1437,14 @@ impl Instruction for IInc {
         // Confirm that this updates the value.
         *var.as_int_mut()? += self.const_incr;
         Ok(())
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            None => false,
+            Some(other) => self == other,
+        }
     }
 }

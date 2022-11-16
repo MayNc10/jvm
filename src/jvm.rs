@@ -19,9 +19,11 @@ use std::string::String;
 use std::time::Instant;
 use std::vec::Vec;
 
+use self::instructions::Instruction;
+
 // Just useful for code readability
 mod operations;
-mod instructions;
+pub mod instructions;
 pub mod settings;
 
 const STEP_SIZE: usize = 10;
@@ -82,11 +84,16 @@ impl JVM {
             class_path,
         }
     }
-    pub fn new_with_main_class(c: ClassFile, flags: u8, class_path: Option<String>) -> Result<JVM, Error> {
+    pub fn new_with_main_class(c: ClassFile, code_bytes: Vec<Vec<u8>>, flags: u8, class_path: Option<String>) -> Result<JVM, Error> {
         let mut jvm = Self::new_jvm(String::from(c.name()), flags, class_path);
+
         let name = String::from(c.name());
         let class = class::new_class(c, &mut jvm)?;
-        jvm.m_loaded_classes.insert(name, class);
+        jvm.m_loaded_classes.insert(name, class.clone());
+
+        // Init the class file.
+        unsafe { Rc::get_mut_unchecked(&mut class.get_class_file()) }.init_code(code_bytes, &mut jvm)?;
+        
         // After adding the class, we initialize the class
         // We should use this error instead of ignoring it.
         let mut found_clinit = true;
@@ -128,13 +135,16 @@ impl JVM {
         let metadata = fs::metadata(&resolved_path).unwrap();
         let size = if metadata.len() % 8 == 0 {metadata.len() / 8} else {metadata.len() / 8 + 1};
         let buffer: Vec<u64> = vec![0; size as usize];
-        let c = unsafe {
+        let (file, code) = unsafe {
             let buf_bytes = std::slice::from_raw_parts_mut(buffer.as_ptr() as *mut u8, buffer.len() * std::mem::size_of::<u64>());
-            f.read_exact(buf_bytes).unwrap();
-            class::new_class(class::classfile::ClassFile::new(buf_bytes)?, self)?
+            f.read(buf_bytes).unwrap();
+            class::classfile::ClassFile::new(buf_bytes)?
         };
+        let c = class::new_class(file, self)?;
         // Adding the class to the map here seems a bit weird, but if we don't we overflow the stack.
         self.m_loaded_classes.insert(String::from(c.get_class_file().name()), Rc::clone(&c)); 
+        // init the code here to prevent endless recursion
+        unsafe { Rc::get_mut_unchecked(&mut c.get_class_file())}.init_code(code, self)?;
         // clinit if a class has it.
         let mut found_clinit = true;
         if let Err(e) = self.setup_method_call_from_name_on_main("<clinit>", "()V", true) {
@@ -209,14 +219,32 @@ impl JVM {
             }
         }
         for _ in 0..step_size {
+            let old_pc = self.current_thread().pc();
+            let old_frame_num = self.current_thread().m_stack.len();
             self.step1();
             if self.has_encoutered_error() | self.m_has_halted {
                 break;
+            }
+            let thread = current_thread_mut!(self);
+            if thread.m_stack.len() == 0 {
+                // Done with code, exit.
+                self.m_threads.remove(self.m_thread_index);
+                return;
+            }
+            if (self.current_thread().pc() == old_pc && self.current_thread().m_stack.len() == old_frame_num) || self.current_thread().m_stack.len() < old_frame_num {
+                // Means we haven't made any jumps, increment. 
+                // Technically this allows for jumps down. This is intentional, because otherwise we would jump down to the instruction that jumped us up,
+                // creating an infinite loop.
+                // The only way this breaks is if an instruction jumps to itself.
+                // FIXME: Deal with these types of infinite loops.
+                let thread = current_thread_mut!(self);
+                thread.inc_pc(1); // IMPORTANT: Account for this in instructions.
             }
         }
     }
     pub fn run(&mut self) {
         while !self.m_crash_info.has_crashed {
+            let old_num_threads = self.m_threads.len();
             self.step(self.m_step_size);
             if self.m_thrown_error != Error::None {
                 if self.m_thrown_error == Error::Exception {
@@ -260,7 +288,14 @@ impl JVM {
             if self.m_has_halted {
                 return;
             }
-            self.m_thread_index += 1;
+            if self.m_threads.len() < old_num_threads {
+                // Don't inc idx and possibly exit
+                if self.m_threads.len() == 0 {
+                    return;
+                }
+            } else {
+                self.m_thread_index += 1;
+            }
             self.m_thread_index %= self.m_threads.len();
         }
     }
@@ -312,22 +347,23 @@ impl JVM {
 
 impl JVM {
     pub fn step1(&mut self) {
-        let wide: bool;
-        let opcode = {
-            let thread = self.current_thread();
+        let (opcode, pc) = {
+            let thread = current_thread_mut!(self);
             if thread.m_stack.is_empty() {
                 self.m_has_halted = true;
                 return;
             }
-            wide = thread.next_instruction_is_wide;
             let pc = thread.pc();
-            thread.current_frame().current_method.code_at(pc)
+            let frame = current_frame_mut!(thread);
+            (frame.current_method.code_at_mut(pc), pc)
         };
         if let Err(e) = opcode {
             self.m_thrown_error = e;
             return;
         }
-        let op = opcode.unwrap();
+        let op = opcode.unwrap() as *mut Box<dyn Instruction>;
+        //println!("Executing {}: {:?}", pc, unsafe{ &*op } );
+        /* 
         let err = match op {
             0 => self.nop(),
             1 => self.aconst_null(),
@@ -542,6 +578,13 @@ impl JVM {
             _ => {
                 panic!("Error: Opcode {} not supported yet", op);
             },
+        };
+        */
+        let err = unsafe {
+            // I can't find a way to express to Rust what I want to do here, so we have to use unsafe. 
+            // Essentially, the op is always 'within' the JVM and so this will always be a double borrow of self.
+            // I don't think there is a way to guarantee to Rust that op.execute will never delete the op through accessing the class that owns it. 
+            (*op).execute(self)
         };
         if let Err(e) = err {
             self.m_thrown_error = e;

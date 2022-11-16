@@ -180,7 +180,7 @@ mod speed {
     use super::*;
 
     #[test]
-    fn factorial() {
+    fn primes() {
         test_file_timed("speed", "Primes");
     }
 }

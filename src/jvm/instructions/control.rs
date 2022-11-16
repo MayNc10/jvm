@@ -1,7 +1,7 @@
 use super::*;
 use crate::compress_addr;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Goto {
     offset: isize,
 }
@@ -9,12 +9,12 @@ impl Instruction for Goto {
     fn name(&self) -> &'static str {
         "goto"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
             v.remove(0); v.remove(0);
             Ok(Goto {offset})
@@ -26,9 +26,18 @@ impl Instruction for Goto {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Goto>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Jsr {
     offset: isize,
 }
@@ -36,12 +45,12 @@ impl Instruction for Jsr {
     fn name(&self) -> &'static str {
         "jsr"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize
             };
             v.remove(0); v.remove(0);
             Ok(Jsr {offset})
@@ -56,9 +65,18 @@ impl Instruction for Jsr {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Jsr>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Ret {
     index: usize,
 }
@@ -66,13 +84,11 @@ impl Instruction for Ret {
     fn name(&self) -> &'static str {
         "ret"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
-            let index = unsafe {
-                usize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 1).try_into().unwrap())
-            };
+            let index = v[0] as usize;
             v.remove(0); v.remove(0);
             Ok(Ret {index})
         }
@@ -86,9 +102,18 @@ impl Instruction for Ret {
         thread.set_pc(addr as usize)?;
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Ret>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TableSwitch {
     default: isize,
     low: isize,
@@ -99,7 +124,7 @@ impl Instruction for TableSwitch {
     fn name(&self) -> &'static str {
         "tableswitch"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, mut true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, mut true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -137,18 +162,26 @@ impl Instruction for TableSwitch {
                 Some(v) => *v.as_int()?,
                 None => return Err(Error::StackUnderflow(Opcode::TABLESWITCH)),
             } as isize;
-            let target = match (index >= self.low) && (index <= self.high) {
-                true => index - self.low,
+            match (index >= self.low) && (index <= self.high) {
+                true => self.j_offsets[(index - self.low) as usize],
                 false => self.default,
-            };
-            self.j_offsets[target as usize]
+            }
         };
         thread.inc_pc(offset)?;
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<TableSwitch>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LookupSwitch {
     default: isize,
     pairs: Box<[(i32, isize)]>,
@@ -157,7 +190,7 @@ impl Instruction for LookupSwitch {
     fn name(&self) -> &'static str {
         "lookupswitch"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, mut true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, mut true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -186,6 +219,7 @@ impl Instruction for LookupSwitch {
     fn execute(&mut self, jvm : &mut JVM) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(jvm);
         let offset = {
+            // Maybe cache offsets?
             let frame = access_macros::current_frame_mut!(thread);
             let key = match frame.op_stack.pop() {
                 Some(v) => *v.as_int()?,
@@ -199,15 +233,24 @@ impl Instruction for LookupSwitch {
         thread.inc_pc(offset)?;
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<LookupSwitch>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IReturn {}
 impl Instruction for IReturn {
     fn name(&self) -> &'static str {
         "ireturn"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -243,15 +286,24 @@ impl Instruction for IReturn {
         frame.op_stack.push(return_value);
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<IReturn>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LReturn {}
 impl Instruction for LReturn {
     fn name(&self) -> &'static str {
         "lreturn"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -278,15 +330,24 @@ impl Instruction for LReturn {
         frame.op_stack.push(return_value);
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<LReturn>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FReturn {}
 impl Instruction for FReturn {
     fn name(&self) -> &'static str {
         "freturn"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -313,15 +374,24 @@ impl Instruction for FReturn {
         frame.op_stack.push(return_value);
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<FReturn>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DReturn {}
 impl Instruction for DReturn {
     fn name(&self) -> &'static str {
         "dreturn"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -348,15 +418,24 @@ impl Instruction for DReturn {
         frame.op_stack.push(return_value);
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<DReturn>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct AReturn {}
 impl Instruction for AReturn {
     fn name(&self) -> &'static str {
         "areturn"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -460,15 +539,24 @@ impl Instruction for AReturn {
         frame.op_stack.push(return_value);
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<AReturn>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Return {}
 impl Instruction for Return {
     fn name(&self) -> &'static str {
         "return"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -487,6 +575,15 @@ impl Instruction for Return {
             Some(_) => Ok(()),
             None => Err(Error::FrameStackUnderflow(Opcode::RETURN)),
         }   
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Return>() {
+            None => false,
+            Some(other) => self == other,
+        }
     }
 }
 

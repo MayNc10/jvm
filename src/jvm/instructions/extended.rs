@@ -3,13 +3,13 @@ use crate::reference::array::Array;
 use super::*;
 use crate::compress_addr;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Wide {}
 impl Instruction for Wide {
     fn name(&self) -> &'static str {
         "wide"
     }
-    fn new(_v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -19,9 +19,18 @@ impl Instruction for Wide {
     fn execute(&mut self, _jvm : &mut JVM) -> Result<(), Error> {
         Err(Error::Wide)
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<Wide>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MultiANewArray {
     index: u16,
     dimensions: usize,
@@ -30,7 +39,7 @@ impl Instruction for MultiANewArray {
     fn name(&self) -> &'static str {
         "multianewarray"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -61,9 +70,18 @@ impl Instruction for MultiANewArray {
         frame.op_stack.push(array_ref_val);
         Ok(())
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<MultiANewArray>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfNull {
     offset: isize,
 }
@@ -71,12 +89,12 @@ impl Instruction for IfNull {
     fn name(&self) -> &'static str {
         "ifnull"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) 
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize 
             };
             v.remove(0); v.remove(0);
             Ok(IfNull {offset})
@@ -95,9 +113,18 @@ impl Instruction for IfNull {
         Ok(())
     }
     compress_addr!(offset);
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<IfNull>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfNonNull {
     offset: isize,
 }
@@ -105,12 +132,12 @@ impl Instruction for IfNonNull {
     fn name(&self) -> &'static str {
         "ifnonnull"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
             let offset = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) 
+                i16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap()) as isize 
             };
             v.remove(0); v.remove(0);
             Ok(IfNonNull {offset})
@@ -129,9 +156,18 @@ impl Instruction for IfNonNull {
         Ok(())
     }
     compress_addr!(offset);
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<IfNonNull>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct GotoW {
     offset: isize,
 }
@@ -139,7 +175,7 @@ impl Instruction for GotoW {
     fn name(&self) -> &'static str {
         "goto_w"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -156,9 +192,18 @@ impl Instruction for GotoW {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<GotoW>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct JsrW {
     offset: isize,
 }
@@ -166,7 +211,7 @@ impl Instruction for JsrW {
     fn name(&self) -> &'static str {
         "jsr_w"
     }
-    fn new(v: &mut Vec<u8>, _c: Rc<dyn Class>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
+    fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
@@ -186,4 +231,13 @@ impl Instruction for JsrW {
         Ok(())
     }
     compress_addr!{offset}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn eq(&self, other: &dyn Instruction) -> bool {
+        match other.as_any().downcast_ref::<JsrW>() {
+            None => false,
+            Some(other) => self == other,
+        }
+    }
 }

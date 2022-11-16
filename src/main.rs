@@ -1,13 +1,13 @@
 use std::{env, fs::File, fs, io::Read};
 use rust_jvm::{jvm::JVM, class::classfile::ClassFile, argsparser};
 
-pub fn load_class(f: &mut File, path: &str) -> ClassFile {
+pub fn load_class(f: &mut File, path: &str) -> (ClassFile, Vec<Vec<u8>>) {
     unsafe {
         let metadata = fs::metadata(path).unwrap();
         let size = if metadata.len() % 8 == 0 {metadata.len() / 8} else {metadata.len() / 8 + 1};
         let buffer: Vec<u64> = vec![0; size as usize];
         let buf_bytes = std::slice::from_raw_parts_mut(buffer.as_ptr() as *mut u8, buffer.len() * std::mem::size_of::<u64>());
-        f.read_exact(buf_bytes).unwrap();
+        f.read(buf_bytes).unwrap();
         ClassFile::new(buf_bytes).unwrap()
     }
 }
@@ -27,12 +27,12 @@ fn main() {
             return;
         }
     };
-    let main_class_file = load_class(&mut result_args.file, &result_args.fpath);
+    let (main_class_file, code_bytes) = load_class(&mut result_args.file, &result_args.fpath);
     if result_args.should_dump {
         println!("Loaded Class: {main_class_file}");
     }
     if result_args.should_run {
-        let jvm = JVM::new_with_main_class(main_class_file, result_args.flags, result_args.classpath.clone()).unwrap();
+        let jvm = JVM::new_with_main_class(main_class_file, code_bytes, result_args.flags, result_args.classpath.clone()).unwrap();
         jvm.excecute();
     }
 

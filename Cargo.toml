@@ -10,5 +10,9 @@ lto = true
 panic = "abort"
 codegen-units = 1
 
+[profile.bench]
+debug = true
+
 [dependencies]
 paste = "1.0.9"
+dyn-clone = "1.0.9"

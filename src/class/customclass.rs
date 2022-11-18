@@ -352,7 +352,11 @@ impl CustomClass {
         let function = self.module.add_function(fname.as_str(), fn_type, None);
         let basic_block = self.context.append_basic_block(function, "entry");
         self.builder.position_at_end(basic_block);
-        
+        // Create locals
+        for local_num in 0..method.code.unwrap().max_locals {
+            let desc = method.code.unwrap().stack_map_table.unwrap().
+            self.builder.build_alloca(, name)
+        }
 
         for op in method.code().unwrap() {
             op.jit(self.context, &self.module, &self.builder, &self.execution_engine, &fname, function);

@@ -2,7 +2,7 @@ use std::any::Any;
 use std::ptr::slice_from_raw_parts;
 use std::rc::Rc;
 use std::result::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map};
 
 use crate::class::{Class, classfile::*};
 use crate::constant_pool::NameAndType;

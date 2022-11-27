@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::mem::size_of;
 use std::ptr::slice_from_raw_parts;
 use std::rc::Rc;
 use std::result::Result;
@@ -9,36 +10,43 @@ use crate::constant_pool::NameAndType;
 use crate::data_access;
 use crate::errorcodes::{Error, Opcode};
 use crate::jvm::JVM;
+use crate::multitypebox::MultiTypeBox;
 use super::object::Object;
 use crate::value::{Value, ValueMarker};
 
 // Allows for future work to remove HashMap access
-// TODO: COMPRESS 
-/* struct Shape {
-    mem: Box<[u8]>,
+// TODO: Store NameAndTypes more efficiently (i.e. without strings).
+ struct Shape {
+    mem: MultiTypeBox,
     layout: HashMap<NameAndType, (usize, ValueMarker)>
 }
 
 impl Shape {
-    pub fn new(map: &mut Vec<(NameAndType, Value<dyn Class, dyn Object>)>) -> Shape {
+    pub fn new(mut map: Vec<(NameAndType, Value<dyn Class, dyn Object>)>) -> Shape {
+        let mut map: Vec<(&mut NameAndType, ValueMarker)> = map.iter_mut().
+            map(|(n, v) |  (n, ValueMarker::from(v).unwrap())).collect();
         map.sort_by(|(_, v), (_, other)| 
-            ValueMarker::from(v).unwrap().cmp(&ValueMarker::from(other).unwrap()));
-        /*let alloc_size = map.iter().fold(0_usize, |acc, (_, v)| 
-            acc + ValueMarker::from(v).unwrap().size() as usize); */
-        let alloc_size = map.len() * 8;   
-        let mem = data_access::alloc_box_buffer::<Value<dyn Class, dyn Object>>(alloc_size);
-        let mut offset = 0;
+            other.cmp(&v)); // Reversed to sort biggest -> smallest
+        let mut counts = [0; 5];
+        // count number of each
+        for (_, val) in &map {
+            counts[MultiTypeBox::offset_idx_from_size(val.size() as usize).unwrap()] += 1;
+        }
+        let mem = MultiTypeBox::new(counts).unwrap();
         let mut layout = HashMap::new();
-        for (nty, val) in map {
-            layout.insert(nty.clone(), (offset, ValueMarker::from(val).unwrap()));
-            offset += 8
-            // init box
-        }   
+        let mut offsets = [0; 5];
+        for (name, val) in &map {
+            layout.insert((*name).clone(), (offsets[MultiTypeBox::offset_idx_from_size(val.size() as usize).unwrap()], *val));
+            offsets[MultiTypeBox::offset_idx_from_size(val.size() as usize).unwrap()] += 1;
+        }
         Shape { mem, layout }
+
     }
-    pub fn get(&self, var: NameAndType) -> Value
+    pub fn get_from_NAT(&self, var: NameAndType) -> Value<dyn Class, dyn Object> {
+        panic!()
+    }
 }
-*/
+
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct CustomObject<C> 

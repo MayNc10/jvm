@@ -63,10 +63,37 @@ pub mod stack_map_table {
                     let last_map = uncompressed_map.last().unwrap();
                     uncompressed_map.push(last_map[0..last_map.len() - (251 - ftype) as usize].into())
                 },
-                StackMapFrame::AppendFrame(, , )
+                StackMapFrame::AppendFrame(_, _, new_locals) => {
+                    let mut new_map = uncompressed_map.last().unwrap().clone();
+                    new_map.extend_from_slice(&new_locals);
+                    uncompressed_map.push(new_map);
+                },
+                StackMapFrame::FullFrame(_, locals, _) => uncompressed_map.push(locals.clone()),
             }
         }
-        todo!("local var layout");
+        let mut true_map = Vec::new();
+        let mut idx = 0;
+        loop {
+            let mut found = false;
+            for vec in &uncompressed_map {
+                if idx < vec.len() {
+                    if idx == true_map.len() {
+                        true_map.push(vec[idx].clone());
+                    } 
+                    else {
+                        if true_map[idx] != vec[idx] {
+                            panic!("Local variable compression doesn't work!");
+                        }
+                    }
+                    found = true;
+                }
+            }
+            if !found {
+                break;
+            }
+            idx += 1;
+        }
+        return true_map;
     }
 }
 

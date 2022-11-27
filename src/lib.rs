@@ -19,7 +19,7 @@ pub mod attributes;
 pub mod constant_pool;
 pub mod flags;
 pub mod reference;
-pub mod safebox;
+pub mod multitypebox;
 
 #[cfg(test)]
 pub mod testing;

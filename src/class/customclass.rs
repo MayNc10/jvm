@@ -4,6 +4,7 @@ use inkwell::context::Context;
 use inkwell::execution_engine::{ExecutionEngine, JitFunction};
 use inkwell::module::Module;
 use inkwell::types::{BasicType, BasicMetadataTypeEnum};
+use inkwell::targets::{InitializationConfig, Target};
 
 use std::{collections::HashMap, rc::Rc};
 
@@ -76,7 +77,7 @@ impl Class for CustomClass {
         let builder = jvm.context.create_builder();
         let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None).unwrap();
 
-        let mut class = CustomClass { class_file: Rc::new(file), static_fields, context: jvm.context, module, builder, execution_engine};
+        let class = CustomClass { class_file: Rc::new(file), static_fields, context: jvm.context, module, builder, execution_engine};
 
         if jvm.should_always_jit {
             for method in &class.get_class_file().methods {
@@ -87,7 +88,7 @@ impl Class for CustomClass {
                 }
 
                 if can_jit {
-                    class.codegen_fn(jvm, method);
+                    //class.codegen_fn(jvm, method);
                 }
             } 
         }
@@ -333,6 +334,7 @@ impl Class for CustomClass {
     }
 }
 
+/* 
 impl CustomClass {
     fn codegen_fn(&mut self, jvm: &mut JVM, method: &MethodInfo) {
         // Maybe put this verification pass somewhere else
@@ -363,5 +365,5 @@ impl CustomClass {
         }
     }
 }
-
+*/
 

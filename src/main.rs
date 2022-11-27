@@ -1,8 +1,14 @@
 use inkwell::context::Context;
+use inkwell::targets::{InitializationConfig, Target};
+use inkwell::execution_engine::ExecutionEngine;
 
+use rust_jvm::class::Class;
+use rust_jvm::reference::Reference;
+use rust_jvm::reference::object::Object;
 use send_wrapper::SendWrapper;
 use once_cell::sync::Lazy;
 
+use std::mem::size_of;
 use std::{env, fs::File, fs, io::Read};
 use rust_jvm::{jvm::JVM, class::classfile::ClassFile, argsparser};
 
@@ -20,6 +26,9 @@ pub fn load_class(f: &mut File, path: &str) -> (ClassFile, Vec<Vec<u8>>) {
 static CONTEXT: Lazy<SendWrapper<Context>> = Lazy::new(|| SendWrapper::new(Context::create()));
 
 fn main() {
+    Target::initialize_native(&InitializationConfig::default()).expect("Failed to initialize native target");
+    ExecutionEngine::link_in_mc_jit();
+
     let args: Vec<String> = env::args().collect();
     let mut result_args = match argsparser::parse_args(&args) {
         Ok(cli) => cli,

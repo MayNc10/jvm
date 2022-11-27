@@ -8,10 +8,12 @@
 // https://doc.rust-lang.org/nightly/alloc/borrow/enum.Cow.html
 use std::fmt;
 use std::mem::size_of;
+use std::rc::Rc;
 use std::result::Result;
 
 use crate::class::Class;
 use crate::errorcodes::Error;
+use crate::multitypebox::MultiTypeBox;
 use crate::reference::{self, Reference};
 use crate::reference::object::Object;
 
@@ -23,7 +25,7 @@ use inkwell::module::Module;
 use inkwell::types::BasicTypeEnum;
 
 #[repr(u8)]
-#[derive(Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum ValueMarker {
     Byte,
     Short,
@@ -50,16 +52,16 @@ impl ValueMarker {
         }
     }
     pub fn size(&self) -> u8 {
-        match self {
-            Self::Byte => size_of::<u8>() as u8,
-            Self::Short => size_of::<u16>() as u8,
-            Self::Int => size_of::<i32>() as u8,
-            Self::Long => size_of::<i64>() as u8,
-            Self::Char => size_of::<u16>() as u8,
-            Self::Float => size_of::<f32>() as u8,
-            Self::Double => size_of::<f64>() as u8,
-            Self::Reference => size_of::<Reference<dyn Class, dyn Object>>() as u8,
-        }
+        (match self {
+            Self::Byte => size_of::<u8>(),
+            Self::Short => size_of::<u16>(),
+            Self::Int => size_of::<i32>(),
+            Self::Long => size_of::<i64>(),
+            Self::Char => size_of::<u16>(),
+            Self::Float => size_of::<f32>(),
+            Self::Double => size_of::<f64>(),
+            Self::Reference => size_of::<Reference<dyn Class, dyn Object>>(),
+        }) as u8
     }
     pub fn llvm_type<'a>(&'a self, ctx: &'static Context) -> BasicTypeEnum<'static> {
         match self {
@@ -72,6 +74,19 @@ impl ValueMarker {
             Self::Double => BasicTypeEnum::FloatType(ctx.f64_type()),
             Self::Reference => BasicTypeEnum::PointerType(ctx.i128_type().ptr_type(AddressSpace::Generic)), // For alignment
         }
+    }
+   
+    pub fn to_value(&self, b: &MultiTypeBox, idx: usize) -> Option<Value<dyn Class, dyn Object>> {
+        Some( match self {
+            ValueMarker::Byte => Value::Byte(*b.get::<i8>(idx)? as i32),
+            ValueMarker::Short => Value::Short(*b.get::<i16>(idx)? as i32),
+            ValueMarker::Int => Value::Int(*b.get(idx)?),
+            ValueMarker::Long => Value::Long(*b.get(idx)?),
+            ValueMarker::Char => Value::Char(*b.get::<u16>(idx)? as i32),
+            ValueMarker::Float => Value::Float(*b.get(idx)?),
+            ValueMarker::Double => Value::Double(*b.get(idx)?),
+            ValueMarker::Reference => Value::Reference(b.get::<Reference<dyn Class, dyn Object>>(idx)?.clone()),
+        } )
     }
 }
 

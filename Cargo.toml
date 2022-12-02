@@ -9,6 +9,7 @@ edition = "2021"
 lto = true
 panic = "abort"
 codegen-units = 1
+#debug = true
 
 [profile.bench]
 debug = true

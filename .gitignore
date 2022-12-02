@@ -1,6 +1,5 @@
 /target
-/classlibs
-/modules
+/classlibs/*.*
 *.checkstyle
 *.classpath
 *.project
@@ -8,4 +7,4 @@
 *.svg
 *.data
 *.data.old
-
+*.out.*

@@ -17,6 +17,10 @@ debug = true
 [dependencies]
 paste = "1.0.9"
 dyn-clone = "1.0.9"
-inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm12-0"] }
 send_wrapper = "0.6.0"
 once_cell = "1.16.0"
+colored = "2.0.0"
+yew = { version = "0.20.0", features = ["csr"] }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm12-0"] }

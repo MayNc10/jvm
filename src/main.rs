@@ -1,10 +1,4 @@
-use inkwell::context::Context;
-use inkwell::targets::{InitializationConfig, Target};
-use inkwell::execution_engine::ExecutionEngine;
-
-use rust_jvm::class::Class;
-use rust_jvm::reference::Reference;
-use rust_jvm::reference::object::Object;
+use rust_jvm::load_class;
 use send_wrapper::SendWrapper;
 use once_cell::sync::Lazy;
 
@@ -12,21 +6,20 @@ use std::mem::size_of;
 use std::{env, fs::File, fs, io::Read};
 use rust_jvm::{jvm::JVM, class::classfile::ClassFile, argsparser};
 
-pub fn load_class(f: &mut File, path: &str) -> (ClassFile, Vec<Vec<u8>>) {
-    unsafe {
-        let metadata = fs::metadata(path).unwrap();
-        let size = if metadata.len() % 8 == 0 {metadata.len() / 8} else {metadata.len() / 8 + 1};
-        let buffer: Vec<u64> = vec![0; size as usize];
-        let buf_bytes = std::slice::from_raw_parts_mut(buffer.as_ptr() as *mut u8, buffer.len() * std::mem::size_of::<u64>());
-        f.read(buf_bytes).unwrap();
-        ClassFile::new(buf_bytes).unwrap()
-    }
-}
+#[cfg(not(target_family = "wasm"))]
+use {
+    inkwell::context::Context,
+    inkwell::targets::{InitializationConfig, Target},
+    inkwell::execution_engine::ExecutionEngine,
+};
 
+#[cfg(not(target_family = "wasm"))]
 static CONTEXT: Lazy<SendWrapper<Context>> = Lazy::new(|| SendWrapper::new(Context::create()));
 
 fn main() {
+    #[cfg(not(target_family = "wasm"))]
     Target::initialize_native(&InitializationConfig::default()).expect("Failed to initialize native target");
+    #[cfg(not(target_family = "wasm"))]
     ExecutionEngine::link_in_mc_jit();
 
     let args: Vec<String> = env::args().collect();
@@ -44,11 +37,14 @@ fn main() {
         }
     };
     let (main_class_file, code_bytes) = load_class(&mut result_args.file, &result_args.fpath);
+    #[cfg(not(target_family = "wasm"))]
+    let mut jvm = JVM::new_with_main_class(main_class_file, code_bytes, result_args.flags, result_args.classpath.clone(), &CONTEXT).unwrap();
+    #[cfg(target_family = "wasm")]
+    let mut jvm = JVM::new_with_main_class(main_class_file, code_bytes, result_args.flags, result_args.classpath.clone()).unwrap();
     if result_args.should_dump {
-        println!("Loaded Class: {main_class_file}");
+        println!("Loaded Class: {}", jvm.resolve_class_reference(jvm.m_main_class_name.clone().as_str()).unwrap().get_class_file());
     }
     if result_args.should_run {
-        let jvm = JVM::new_with_main_class(main_class_file, code_bytes, result_args.flags, result_args.classpath.clone(), &CONTEXT).unwrap();
         jvm.excecute();
     }
 

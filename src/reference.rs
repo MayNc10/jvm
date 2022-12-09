@@ -5,7 +5,7 @@ pub mod packedboolarray;
 use crate::jvm::JVM;
 use crate::reference::array::Array;
 use crate::class::Class;
-use crate::errorcodes::Error;
+use crate::errorcodes::{Error, Opcode};
 use crate::reference::object::Object;
 
 use std::rc::Rc;
@@ -140,21 +140,27 @@ impl Reference<dyn Class, dyn Object> {
         }
     }
 
-    pub fn as_object(&self) -> Option<&Rc<dyn Object>> {
+    pub fn as_object(&self) -> Result<&Rc<dyn Object>, Error> {
         if let Reference::Object(o, _) = self {
-            Some(o)
+            Ok(o)
+        }
+        else if let Reference::Null = self {
+            Err(Error::NullPointerException(Opcode::Unknown))
         }
         else {
-            None
+            Err(Error::IllegalReferenceCastToObject)
         }
     }
 
-    pub fn as_object_mut(&mut self) -> Option<&mut Rc<dyn Object>> {
+    pub fn as_object_mut(&mut self) -> Result<&mut Rc<dyn Object>, Error> {
         if let Reference::Object(o, _) = self {
-            Some(o)
+            Ok(o)
+        }
+        else if let Reference::Null = self {
+            Err(Error::NullPointerException(Opcode::Unknown))
         }
         else {
-            None
+            Err(Error::IllegalReferenceCastToObject)
         }
     }
 

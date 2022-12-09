@@ -77,7 +77,7 @@ pub mod field {
     pub const ACC_SYNTHETIC: u16 = 0x1000;
     pub const ACC_ENUM: u16 = 0x4000;
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub struct AccessFlags {
         pub flags: u16
     }
@@ -144,7 +144,7 @@ pub mod method {
     pub const ACC_STRICT: u16 = 0x0800;
     pub const ACC_SYNTHETIC: u16 = 0x1000;
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub struct AccessFlags {
         pub flags: u16
     }

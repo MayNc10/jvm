@@ -281,6 +281,29 @@ impl Instruction for IStore1 {
             Some(other) => self == other,
         }
     }
+    fn can_jit(&self) -> bool { true }
+    #[cfg(not(target_family = "wasm"))]
+    fn jit(&self, context: &'static Context, module: &Module<'static>, builder: &Builder<'static>, 
+                engine: &ExecutionEngine<'static>, name: &String, func: FunctionValue, 
+                locals: &Vec<PointerValue>, blocks: &HashMap<usize, BasicBlock>, stack: &PointerValue, top: &PointerValue) 
+    {
+        builder.build_store(
+            locals[1], 
+            builder.build_load(unsafe { 
+                builder.build_in_bounds_gep(*stack, &[
+                    builder.build_load(*top, "top_idx").into_int_value().const_sub(
+                        context.i64_type().const_int(1, false)
+                    )
+                ], "stack_idx")
+            }, "top")
+        );
+
+        builder.build_store(*top, 
+            builder.build_load(*top, "top_idx").into_int_value().const_add(
+                context.i64_type().const_int(1, false)
+            ), 
+        );
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

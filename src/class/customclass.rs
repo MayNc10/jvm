@@ -1,23 +1,24 @@
-use inkwell::OptimizationLevel;
-use inkwell::builder::Builder;
-use inkwell::context::Context;
-use inkwell::execution_engine::{ExecutionEngine, JitFunction};
-use inkwell::module::Module;
-use inkwell::types::{BasicType, BasicMetadataTypeEnum};
-use inkwell::targets::{InitializationConfig, Target};
+use colored::Colorize;
 
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{constant_pool::{NameAndType, Entry}, value::{Value, VarValue}, errorcodes::Opcode, flags, reference::{Reference, array::Array, Monitor}, access_macros, frame::Frame};
+use crate::attributes::code::stack_map_table;
+use crate::llvm::valuemarker::ValueMarker;
+use crate::{constant_pool::{NameAndType, Entry}, value::{Value, VarValue}, errorcodes::Opcode, 
+            flags, reference::{Reference, array::Array, Monitor}, access_macros, frame::Frame};
 
 use super::*;
 
 pub struct CustomClass {
     class_file: Rc<classfile::ClassFile>,
     static_fields: HashMap<NameAndType, Rc<Value<dyn Class, dyn Object>>>, 
+    #[cfg(not(target_family = "wasm"))]
     context: &'static Context,
+    #[cfg(not(target_family = "wasm"))]
     module: Module<'static>,
+    #[cfg(not(target_family = "wasm"))]
     builder: Builder<'static>,
+    #[cfg(not(target_family = "wasm"))]
     execution_engine: ExecutionEngine<'static>,
 }
 
@@ -73,12 +74,20 @@ impl Class for CustomClass {
                 static_fields.insert(name_and_type, Rc::new(value));
             }
         }
-        let module = jvm.context.create_module(file.name());
-        let builder = jvm.context.create_builder();
-        let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None).unwrap();
+        #[cfg(target_family = "wasm")]
+        let class = {
+            CustomClass { class_file: Rc::new(file), static_fields}
+        };
+        #[cfg(not(target_family = "wasm"))]
+        let mut class = {
+            let module = jvm.context.create_module(file.name());
+            let builder = jvm.context.create_builder();
+            let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None).unwrap();
+    
+            CustomClass { class_file: Rc::new(file), static_fields, context: jvm.context, module, builder, execution_engine}
+        };
 
-        let class = CustomClass { class_file: Rc::new(file), static_fields, context: jvm.context, module, builder, execution_engine};
-
+        #[cfg(not(target_family = "wasm"))]
         if jvm.should_always_jit {
             for method in &class.get_class_file().methods {
                 let mut can_jit = true;
@@ -88,7 +97,7 @@ impl Class for CustomClass {
                 }
 
                 if can_jit {
-                    //class.codegen_fn(jvm, method);
+                    class.try_codegen_fn(jvm, method);
                 }
             } 
         }
@@ -174,149 +183,150 @@ impl Class for CustomClass {
         
     }
     fn exec_method(self: Rc<Self>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
-        let thread = access_macros::current_thread_mut!(jvm);
-        let mut new_frame = Frame::new(self.clone(), method.clone());
-        // Fill out the local variables.
         let c_file = self.get_class_file();
-        // Use jvm::parse_descriptor
-        let mut descriptor: &str = c_file.cp_entry(method.descriptor_index)?.as_utf8()?;
-        descriptor = &descriptor[0..descriptor.find(')').unwrap()]; // Skip past the return value
-        descriptor = &descriptor[1..]; // Skip the beginning parenthesis.
-        let locals = &mut new_frame.local_variables;
-        while !descriptor.is_empty() {
-            let mut index = descriptor.len() - 1;
-            if &descriptor[index..] == ";" {
-                index = descriptor.rfind('L').unwrap();
-            }
-            if (index > 0) && &descriptor[index - 1..index] == "[" {
-                // There is a better way of doing this, FIXME.
-                descriptor = &descriptor[..index];
-                index -= 1;
-            }
-            match &descriptor[index..index + 1] {
-                "B" => {
-                    let current_frame = access_macros::current_frame_mut!(thread);
-                    let val = match current_frame.op_stack.pop() {
-                        Some(v) => v,
-                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
-                    };
-                    let inner_value = Value::to_int(val)?;
-                    locals.push(VarValue::Byte(inner_value));
-                    descriptor = &descriptor[..index];
-                },
-                "C" => {
-                    let current_frame = access_macros::current_frame_mut!(thread);
-                    let val = match current_frame.op_stack.pop() {
-                        Some(v) => v,
-                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
-                    };
-                    let inner_value = Value::to_int(val)?;
-                    locals.push(VarValue::Char(inner_value));
-                    descriptor = &descriptor[..index];
-                },
-                "D" => {
-                    let current_frame = access_macros::current_frame_mut!(thread);
-                    locals.push(VarValue::DoubleHighBytes);
-                    let val = match current_frame.op_stack.pop() {
-                        Some(v) => v,
-                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
-                    };
-                    let inner_value = Value::to_double(val)?;
-                    locals.push(VarValue::Double(inner_value));
-                    descriptor = &descriptor[..index];
-                },
-                "F" => {
-                    let current_frame = access_macros::current_frame_mut!(thread);
-                    let val = match current_frame.op_stack.pop() {
-                        Some(v) => v,
-                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
-                    };
-                    let inner_value = Value::to_float(val)?;
-                    locals.push(VarValue::Float(inner_value));
-                    descriptor = &descriptor[..index];
-                },
-                "I" => {
-                    let current_frame = access_macros::current_frame_mut!(thread);
-                    let val = match current_frame.op_stack.pop() {
-                        Some(v) => v,
-                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
-                    };
-                    let inner_value = Value::to_int(val)?;
-                    locals.push(VarValue::Int(inner_value));
-                    descriptor = &descriptor[..index];
-                    
-                },
-                "J" => {
-                    let current_frame = access_macros::current_frame_mut!(thread);
-                    locals.push(VarValue::LongHighBytes);
-                    let val = match current_frame.op_stack.pop() {
-                        Some(v) => v,
-                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
-                    };
-                    let inner_value = Value::to_long(val)?;
-                    locals.push(VarValue::Long(inner_value));
-                    descriptor = &descriptor[..index];
-                },
-                "S" => {
-                    let current_frame = access_macros::current_frame_mut!(thread);
-                    let val = match current_frame.op_stack.pop() {
-                        Some(v) => v,
-                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
-                    };
-                    let inner_value = Value::to_int(val)?;
-                    locals.push(VarValue::Short(inner_value));
-                    descriptor = &descriptor[..index];
-                },
-                "Z" => {
-                    let current_frame = access_macros::current_frame_mut!(thread);
-                    let val = match current_frame.op_stack.pop() {
-                        Some(v) => v,
-                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
-                    };
-                    let inner_value = Value::to_int(val)?;
-                    locals.push(VarValue::Byte(inner_value & 1));
-                    descriptor = &descriptor[..index];
-                },
-                "L" => {
-                    let current_frame = access_macros::current_frame_mut!(thread);
-                    // We could check the class type and make sure it matches up with the expected type, but that's not required by the JVM Spec, so for now we won't
-                    let val = match current_frame.op_stack.pop() {
-                        Some(v) => v,
-                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
-                    };
-                    let inner_value = Value::to_reference(val)?;
-                    locals.push(VarValue::Reference(inner_value));
-                    descriptor = &descriptor[..index];
-                },
-                "[" => {
-                    let val = {
-                        // If this code is the method "main", then we have to add the args manually
-                        if !thread.m_stack.is_empty() {
-                            let current_frame = access_macros::current_frame_mut!(thread);
-                        // We could check the class type and make sure it matches up with the expected type, but that's not required by the JVM Spec, so for now we won't
-                            match current_frame.op_stack.pop() {
-                                Some(v) => v,
-                                None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
-                            }
-                        }
-                        else if self.get_class_file().name() != jvm.m_main_class_name {
-                                panic!();
-                            }
-                        else {
-                            // TODO: Add actual arguments.
-                            let args = Array::new_ref(0, String::from("Ljava/lang/String;"));
-                            let args_ref = Reference::Array(Rc::new(args), Rc::new(Monitor::new()));
-                            Value::Reference(args_ref)
-                        }
-                    };
-                    let inner_value = Value::to_reference(val)?;
-                    locals.push(VarValue::Reference(inner_value));
-                    descriptor = &descriptor[..index];
-                }
-                _ => return Err(Error::IllegalDescriptor),
-            }
+
+        if method.access_flags & flags::method::ACC_NATIVE {
+            eprintln!("{}", 
+            format!("WARNING: Native method {}.{}{} was called, skipping", 
+                c_file.name(),
+                c_file.cp_entry(method.name_index)?.as_utf8()?, 
+                c_file.cp_entry(method.descriptor_index)?.as_utf8()?
+            ).as_str().red());
+            // TODO: Fake return value
+            return Ok(false);
         }
-        locals.reverse(); // We have to push the variables in reverse order, so we correct it after.   
+
+        let thread = access_macros::current_thread_mut!(jvm);
+        // Fill out the local variables.
+        
+        // Use jvm::parse_descriptor
+        let (local_types, _) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index)?.as_utf8()?)?;
+        let mut new_frame = Frame::new(self.clone(), method.clone(), 
+            method.code.as_ref().unwrap().max_locals.into());
+        let locals = &mut new_frame.local_variables;
+        
+        if local_types.len() > 0 {
+            let mut val_idx: usize = local_types.len();
+
+            while val_idx > 0 {
+                let val = local_types[val_idx - 1];
+                match val {
+                    ValueMarker::Byte => {
+                        let current_frame = access_macros::current_frame_mut!(thread);
+                        let val = match current_frame.op_stack.pop() {
+                            Some(v) => v,
+                            None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                        };
+                        let inner_value = Value::to_int(val)?;
+                        locals[val_idx - 1] = VarValue::Byte(inner_value);
+                    },
+                    ValueMarker::Char => {
+                        let current_frame = access_macros::current_frame_mut!(thread);
+                        let val = match current_frame.op_stack.pop() {
+                            Some(v) => v,
+                            None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                        };
+                        let inner_value = Value::to_int(val)?;
+                        locals[val_idx - 1] = VarValue::Char(inner_value);
+                    },
+                    ValueMarker::Double => {
+                        let current_frame = access_macros::current_frame_mut!(thread);
+                        locals[val_idx - 1] = VarValue::DoubleHighBytes;
+                        val_idx -= 1;
+                        let val = match current_frame.op_stack.pop() {
+                            Some(v) => v,
+                            None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                        };
+                        let inner_value = Value::to_double(val)?;
+                        locals[val_idx - 1] = VarValue::Double(inner_value);
+                    },
+                    ValueMarker::Float => {
+                        let current_frame = access_macros::current_frame_mut!(thread);
+                        let val = match current_frame.op_stack.pop() {
+                            Some(v) => v,
+                            None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                        };
+                        let inner_value = Value::to_float(val)?;
+                        locals[val_idx - 1] = VarValue::Float(inner_value);
+                    },
+                    ValueMarker::Int => {
+                        let current_frame = access_macros::current_frame_mut!(thread);
+                        let val = match current_frame.op_stack.pop() {
+                            Some(v) => v,
+                            None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                        };
+                        let inner_value = Value::to_int(val)?;
+                        locals[val_idx - 1] = VarValue::Int(inner_value);
+                        
+                    },
+                    ValueMarker::Long => {
+                        let current_frame = access_macros::current_frame_mut!(thread);
+                        locals[val_idx - 1] = VarValue::LongHighBytes;
+                        val_idx -=  1;
+                        let val = match current_frame.op_stack.pop() {
+                            Some(v) => v,
+                            None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                        };
+                        let inner_value = Value::to_long(val)?;
+                        locals[val_idx - 1] = VarValue::Long(inner_value);
+                    },
+                    ValueMarker::Short => {
+                        let current_frame = access_macros::current_frame_mut!(thread);
+                        let val = match current_frame.op_stack.pop() {
+                            Some(v) => v,
+                            None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                        };
+                        let inner_value = Value::to_int(val)?;
+                        locals[val_idx - 1] = VarValue::Short(inner_value);
+                    },
+                    ValueMarker::Reference => {            
+                        let val = {
+                            // If this code is the method "main", then we have to add the args manually
+                            if !thread.m_stack.is_empty() {
+                                let current_frame = access_macros::current_frame_mut!(thread);
+                            // We could check the class type and make sure it matches up with the expected type, but that's not required by the JVM Spec, so for now we won't
+                                match current_frame.op_stack.pop() {
+                                    Some(v) => v,
+                                    None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                                }
+                            }
+                            else if self.get_class_file().name() != jvm.m_main_class_name {
+                                    panic!();
+                                }
+                            else {
+                                // TODO: Add actual arguments.
+                                let args = Array::new_ref(0, String::from("Ljava/lang/String;"));
+                                let args_ref = Reference::Array(Rc::new(args), Rc::new(Monitor::new()));
+                                Value::Reference(args_ref)
+                            }
+                        };
+                        let inner_value = Value::to_reference(val)?;
+                        locals[val_idx - 1] = VarValue::Reference(inner_value);
+                    }
+                    ValueMarker::Void => {
+                        panic!("There shouldn't be void types in arguments");
+                    }
+                    ValueMarker::Top => {
+                        panic!("We shouldn't read top type");
+                    },
+                }
+                val_idx -= 1;
+            }  
+        }
+        /* 
+        print!("Local types for static execution: [");
+        for ty in &*local_types {
+            print!(" {ty:?}, ");
+        }
+        println!("]");
+
+        print!("Current local vars: [");
+        for var in locals {
+            print!(" {var}, ");
+        }
+        println!("]");
+        */
+
         thread.push_frame(new_frame);
         Ok(false)
     }
@@ -334,15 +344,32 @@ impl Class for CustomClass {
     }
 }
 
-/* 
+#[cfg(not(target_family = "wasm"))]
+use {
+    inkwell::OptimizationLevel,
+    inkwell::basic_block::BasicBlock,
+    inkwell::builder::Builder,
+    inkwell::context::Context,
+    inkwell::execution_engine::{ExecutionEngine, JitFunction},
+    inkwell::module::Module,
+    inkwell::types::{BasicType, BasicMetadataTypeEnum},
+    inkwell::targets::{InitializationConfig, Target},
+    inkwell::values::{IntValue, FunctionValue},
+};
+
 impl CustomClass {
-    fn codegen_fn(&mut self, jvm: &mut JVM, method: &MethodInfo) {
+    pub fn gen_block_indexes(&self, method: &MethodInfo) -> Vec<usize> {
+        // Create block layout
+        todo!()
+    }
+    #[cfg(not(target_family = "wasm"))]
+    fn try_codegen_fn(&mut self, jvm: &mut JVM, method: &MethodInfo) {
         // Maybe put this verification pass somewhere else
         let mut can_jit = true;
         for op in method.code().unwrap() {
             can_jit &= op.can_jit();
         }
-        assert!(can_jit);
+        if !can_jit { return; }
 
         let c_file = self.get_class_file();
         let mut fname = String::from(c_file.cp_entry(method.name_index).unwrap().as_utf8().unwrap());
@@ -350,20 +377,48 @@ impl CustomClass {
         let (args, ret) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index).
             unwrap().as_utf8().unwrap()).unwrap();
         let fn_type = ret.llvm_type(self.context).fn_type(
-            args.into_iter().map(|t| t.llvm_type(self.context).into()).collect::<Vec<BasicMetadataTypeEnum>>().as_slice(), false);
+            args.into_iter()
+            .map(|t| t.llvm_type(self.context).into())
+            .collect::<Vec<BasicMetadataTypeEnum>>().as_slice(), false);
         let function = self.module.add_function(fname.as_str(), fn_type, None);
         let basic_block = self.context.append_basic_block(function, "entry");
         self.builder.position_at_end(basic_block);
         // Create locals
-        for local_num in 0..method.code.unwrap().max_locals {
-            let desc = method.code.unwrap().stack_map_table.unwrap().
-            self.builder.build_alloca(, name)
+        let local_var_layout = stack_map_table::local_var_layout(
+            method.code.as_ref().unwrap().stack_map_table.as_ref().unwrap());
+        if local_var_layout.is_none() { return; }
+        let local_var_layout = local_var_layout.unwrap();
+
+        let mut local_vars = Vec::new();
+        for local_num in 0..local_var_layout.len() {
+            if local_var_layout[local_num].is_none() { continue; }
+            if local_var_layout[local_num].unwrap() == ValueMarker::Reference { return; } // Skip these for now 
+            local_vars.push(self.builder.build_alloca(local_var_layout[local_num].unwrap().llvm_type(self.context), 
+                format!("l{local_num}").as_str()));
         }
 
-        for op in method.code().unwrap() {
-            op.jit(self.context, &self.module, &self.builder, &self.execution_engine, &fname, function);
+        let block_indexes = self.gen_block_indexes(method);
+        let mut blocks = HashMap::new();
+        for index in block_indexes {
+            blocks.insert(index, self.context.append_basic_block(function, format!("block{index}").as_str()));
         }
+
+        // Create op stack
+        let stack = self.builder.build_array_alloca(self.context.i128_type(), 
+            self.context.i32_type().const_int(method.code.as_ref().unwrap().max_stack.into(), false), "op_stack");
+        let stack_top = self.builder.build_alloca(self.context.i64_type(), "stack_top");
+
+        
+        let mut op_idx = 0;
+        for op in method.code().unwrap() {
+            op_idx += 1;
+            if let Some(block) = blocks.get(&op_idx) { self.builder.position_at_end(*block) }
+
+            op.jit(self.context, &self.module, &self.builder, &self.execution_engine, 
+                &fname, function, &local_vars, &blocks, &stack, &stack_top);
+        }
+        
     }
 }
-*/
+
 

@@ -1,9 +1,8 @@
-use rust_jvm::load_class;
+use rust_jvm::{load_class, value::{Value, VarValue}, reference::object::Object, class::Class};
 use send_wrapper::SendWrapper;
 use once_cell::sync::Lazy;
 
-use std::mem::size_of;
-use std::{env, fs::File, fs, io::Read};
+use std::{env, fs::File, fs, io::Read, mem::size_of};
 use rust_jvm::{jvm::JVM, class::classfile::ClassFile, argsparser};
 
 #[cfg(not(target_family = "wasm"))]

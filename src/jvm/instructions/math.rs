@@ -1428,7 +1428,7 @@ impl Instruction for IInc {
             v.remove(0);
             v.remove(0);
             Ok(IInc {index, const_incr})
-        }
+        } 
     }
     fn execute(&mut self, jvm : &mut JVM) -> Result<(), Error> {
         let thread = current_thread_mut!(jvm);

@@ -1,5 +1,3 @@
-use std::{alloc::{Layout, self}, mem::size_of};
-
 use paste::paste;
 
 macro_rules! accessor {

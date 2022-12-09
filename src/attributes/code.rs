@@ -3,7 +3,7 @@ use crate::jvm::instructions::Instruction;
 use super::{annotations::TypeAnnotation};
 
 pub mod stack_map_table {
-    use crate::errorcodes::Error;
+    use crate::{errorcodes::Error, llvm::valuemarker::ValueMarker};
 
     #[derive(Clone, Debug, PartialEq)]
     pub enum VerificationTypeInfo {
@@ -39,6 +39,16 @@ pub mod stack_map_table {
                 }
             }
         }
+        pub fn as_value_marker(&self) -> Option<ValueMarker> {
+            match self {
+                VerificationTypeInfo::Top => None,
+                VerificationTypeInfo::Integer => Some(ValueMarker::Int),
+                VerificationTypeInfo::Float => Some(ValueMarker::Float),
+                VerificationTypeInfo::Long => Some(ValueMarker::Long),
+                VerificationTypeInfo::Double => Some(ValueMarker::Double),
+                _ => Some(ValueMarker::Reference),
+            }
+        }
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -52,7 +62,7 @@ pub mod stack_map_table {
         FullFrame(u16, Vec<VerificationTypeInfo>, Vec<VerificationTypeInfo>),
     }
 
-    pub fn local_var_layout(map: &Vec<StackMapFrame>) -> Vec<VerificationTypeInfo> {
+    pub fn local_var_layout(map: &Vec<StackMapFrame>) -> Option<Vec<Option<ValueMarker>>> {
         let mut uncompressed_map: Vec<Vec<VerificationTypeInfo>> = Vec::new();
         for frame in map {
             match frame {
@@ -78,11 +88,11 @@ pub mod stack_map_table {
             for vec in &uncompressed_map {
                 if idx < vec.len() {
                     if idx == true_map.len() {
-                        true_map.push(vec[idx].clone());
+                        true_map.push(vec[idx].clone().as_value_marker());
                     } 
                     else {
-                        if true_map[idx] != vec[idx] {
-                            panic!("Local variable compression doesn't work!");
+                        if true_map[idx] != vec[idx].as_value_marker() {
+                            return None;
                         }
                     }
                     found = true;
@@ -93,17 +103,17 @@ pub mod stack_map_table {
             }
             idx += 1;
         }
-        return true_map;
+        return Some(true_map);
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LineNumber {
     pub start_pc: u16,
     pub line_number: u16,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LocalVariable {
     pub start_pc: u16,
     pub length: u16,
@@ -112,7 +122,7 @@ pub struct LocalVariable {
     pub index: u16,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LocalVariableType {
     pub start_pc: u16,
     pub length: u16,
@@ -121,7 +131,7 @@ pub struct LocalVariableType {
     pub index: u16,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Exception {
     pub start_pc: u16,
     pub end_pc: u16,

@@ -1,22 +1,22 @@
 use std::any::Any;
-use std::mem::size_of;
-use std::ptr::slice_from_raw_parts;
 use std::rc::Rc;
 use std::result::Result;
-use std::collections::{HashMap, hash_map};
+use std::collections::HashMap;
 
 use crate::class::{Class, classfile::*};
 use crate::constant_pool::NameAndType;
-use crate::data_access;
 use crate::errorcodes::{Error, Opcode};
+use crate::frame::Frame;
 use crate::jvm::JVM;
 use crate::multitypebox::MultiTypeBox;
+use crate::reference::array::Array;
 use super::object::Object;
-use crate::value::{Value, ValueMarker};
+use crate::llvm::valuemarker::ValueMarker;
+use crate::value::{Value, VarValue};
 
 // Allows for future work to remove HashMap access
 // TODO: Store NameAndTypes more efficiently (i.e. without strings).
- struct Shape {
+struct Shape {
     mem: MultiTypeBox,
     layout: HashMap<NameAndType, (usize, ValueMarker)>
 }
@@ -149,12 +149,17 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
         let cm_class_file = current_method_class.get_class_file();
         let field_ref = cm_class_file.cp_entry(class_index)?.as_field_ref()?;
         // This code is for verifing that the class the field is for is the same as this class. 
+        /*
         let class_ref = *cm_class_file.cp_entry(field_ref.class_index)?.as_class()?;
         let class_name = cm_class_file.cp_entry(class_ref)?.as_utf8()?;
         #[allow(clippy::vtable_address_comparisons)]
-        if Rc::ptr_eq(&Rc::clone(&self.class).as_dyn_rc(), &jvm.resolve_class_reference(class_name)?) {
+        if !Rc::ptr_eq(&Rc::clone(&self.class).as_dyn_rc(), &jvm.resolve_class_reference(class_name)?) {
+            println!("Class refs were not the same! this class pointer: {:p}, other class pointer: {:p}", 
+                Rc::as_ptr(&Rc::clone(&self.class).as_dyn_rc()),  Rc::as_ptr(&jvm.resolve_class_reference(class_name)?));
+
             return Err(Error::IncompatibleObjectAndField(String::from(self.class.get_class_file().name()), String::from(class_name)));
         }
+        */
         let name_and_type_info = cm_class_file.cp_entry(field_ref.name_and_type_index)?.as_name_and_type()?;
         let name = cm_class_file.cp_entry(name_and_type_info.name_index)?.as_utf8()?.clone();
         let descriptor = cm_class_file.cp_entry(name_and_type_info.descriptor_index)?.as_utf8()?.clone();
@@ -177,12 +182,17 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
         let cm_class_file = current_method_class.get_class_file();
         let field_ref = cm_class_file.cp_entry(class_index)?.as_field_ref()?;
         // This code is for verifing that the class the field is for is the same as this class. 
+        /*
         let class_ref = *cm_class_file.cp_entry(field_ref.class_index)?.as_class()?;
         let class_name = cm_class_file.cp_entry(class_ref)?.as_utf8()?;
         #[allow(clippy::vtable_address_comparisons)]
-        if Rc::ptr_eq(&Rc::clone(&self.class).as_dyn_rc(), &jvm.resolve_class_reference(class_name)?) {
+        if !Rc::ptr_eq(&Rc::clone(&self.class).as_dyn_rc(), &jvm.resolve_class_reference(class_name)?) {
+            println!("Class refs were not the same! this class pointer: {:p}, other class pointer: {:p}", 
+                Rc::as_ptr(&Rc::clone(&self.class).as_dyn_rc()),  Rc::as_ptr(&jvm.resolve_class_reference(class_name)?));
+
             return Err(Error::IncompatibleObjectAndField(String::from(self.class.get_class_file().name()), String::from(class_name)));
         }
+        */
         let name_and_type_info = cm_class_file.cp_entry(field_ref.name_and_type_index)?.as_name_and_type()?;
         let name = current_method_class.get_class_file().cp_entry(name_and_type_info.name_index)?.as_utf8()?.clone();
         let descriptor = current_method_class.get_class_file().cp_entry(name_and_type_info.descriptor_index)?.as_utf8()?.clone();
@@ -195,8 +205,118 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
             None => Err(Error::NoSuchFieldError(Opcode::PUTFIELD)),
         }
     }
-    fn exec_method(&mut self, _current_method_class: Rc<dyn Class>, _jvm: &mut JVM, _method: &MethodInfo) -> Result<bool, Error> {
-        Err(Error::Todo(Opcode::NativeMethod))
+    fn exec_method(&mut self, new_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
+        let thread = current_thread_mut!(jvm);
+        // Fill out the local variables.
+        let c_file = new_method_class.get_class_file();
+        // Use jvm::parse_descriptor
+        let (local_types, _) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index)?.as_utf8()?)?;
+        let mut new_frame = Frame::new(new_method_class.as_dyn_rc(), method.clone(), 
+            method.code.as_ref().unwrap().max_locals.into()); // Should take into account implicit 'this'.
+        let locals = &mut new_frame.local_variables; 
+        // Account for implicit 'this'
+        let mut val_idx: usize = local_types.len(); 
+
+        while val_idx > 0 {
+            let val = local_types[val_idx - 1];
+            match val {
+                ValueMarker::Byte => {
+                    let current_frame = current_frame_mut!(thread);
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_int(val)?;
+                    locals[val_idx] = VarValue::Byte(inner_value);
+                },
+                ValueMarker::Char => {
+                    let current_frame = current_frame_mut!(thread);
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_int(val)?;
+                    locals[val_idx] = VarValue::Char(inner_value);
+                },
+                ValueMarker::Double => {
+                    let current_frame = current_frame_mut!(thread);
+                    locals[val_idx] = VarValue::DoubleHighBytes;
+                    val_idx -= 1;
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_double(val)?;
+                    locals[val_idx] = VarValue::Double(inner_value);
+                },
+                ValueMarker::Float => {
+                    let current_frame = current_frame_mut!(thread);
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_float(val)?;
+                    locals[val_idx] = VarValue::Float(inner_value);
+                },
+                ValueMarker::Int => {
+                    let current_frame = current_frame_mut!(thread);
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_int(val)?;
+                    locals[val_idx] = VarValue::Int(inner_value);
+                    
+                },
+                ValueMarker::Long => {
+                    let current_frame = current_frame_mut!(thread);
+                    locals[val_idx] = VarValue::LongHighBytes;
+                    val_idx -=  1;
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_long(val)?;
+                    locals[val_idx] = VarValue::Long(inner_value);
+                },
+                ValueMarker::Short => {
+                    let current_frame = current_frame_mut!(thread);
+                    let val = match current_frame.op_stack.pop() {
+                        Some(v) => v,
+                        None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_int(val)?;
+                    locals[val_idx] = VarValue::Short(inner_value);
+                },
+                ValueMarker::Reference => { 
+                    let current_frame = current_frame_mut!(thread);     
+                    // We could check the class type and make sure it matches up with the expected type, but that's not required by the JVM Spec, so for now we won't       
+                    let val = match current_frame.op_stack.pop() {   
+                                Some(v) => v,
+                                None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                    };
+                    let inner_value = Value::to_reference(val)?;
+                    locals[val_idx] = VarValue::Reference(inner_value);
+                }
+                ValueMarker::Void => {
+                    panic!("There shouldn't be void types in arguments");
+                }
+                ValueMarker::Top => {
+                    panic!("We shouldn't read top type");
+                },
+            }
+            val_idx -= 1;
+        }  
+        let current_frame = current_frame_mut!(thread);
+        let objectref = match current_frame.op_stack.pop() {
+            Some(v) => v,
+            None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+        };
+        let inner_ref = Value::to_reference(objectref)?;
+        locals[0] = VarValue::Reference(inner_ref);
+
+        thread.push_frame(new_frame);
+        Ok(false)
     }
     fn class(&self) -> Rc<dyn Class> {
        Rc::clone(&self.class).as_dyn_rc() 

@@ -88,6 +88,8 @@ impl Instruction for PutStatic {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::PUTSTATIC)),
         };
+        //println!("{class_name}");
+        //todo!();
         unsafe {Rc::get_mut_unchecked(&mut class).put_static(name, descriptor, field, jvm)?; }
         Ok(())
     }
@@ -344,6 +346,7 @@ impl Instruction for InvokeSpecial {
             Ok(InvokeSpecial { index })
         }
     }
+    //https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-6.html#jvms-6.5.invokespecial
     fn execute(&mut self, jvm : &mut JVM) -> Result<(), Error> {
         let thread = access_macros::current_thread_mut!(jvm);
         let frame = access_macros::current_frame_mut!(thread);
@@ -352,7 +355,7 @@ impl Instruction for InvokeSpecial {
         let (method_ref, _) = match entry {
             Entry::MethodRef(refinfo) => (refinfo, false),
             Entry::InterfaceMethodRef(refinfo) => (refinfo, true),
-            _ => return Err(Error::IllegalConstantLoad(Opcode::INVOKESTATIC)),
+            _ => return Err(Error::IllegalConstantLoad(Opcode::INVOKESPECIAL)),
         };
         let current_class = Rc::clone(&frame.rt_const_pool);
         let current_class_file = current_class.get_class_file();
@@ -366,11 +369,13 @@ impl Instruction for InvokeSpecial {
         if (c.get_class_file().access_flags().flags & flags::class::ACC_INTERFACE) > 0 {
             return Err(Error::IncompatibleClassChangeError(Opcode::INVOKESPECIAL));
         } 
+
+
         // Resolve method
         let mut resolved_method_wrapped = None; 
         {
             let mut found = false;
-            while c_file.has_super() && !found {
+            while !found {
                 for method in c_file.methods() {
                     // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
                     // We still need to check for signature polymorphic functions.
@@ -387,6 +392,8 @@ impl Instruction for InvokeSpecial {
                 }   
                 // Recurse up the inheritance tree.
                 if !found {
+                    if !c_file.has_super() { break; }
+
                     c = jvm.resolve_class_reference(c_file.super_name().unwrap())?;
                     c_file = c.get_class_file();
                 }
@@ -403,6 +410,7 @@ impl Instruction for InvokeSpecial {
         let resolved_name = res_method_file.cp_entry(resolved_method.name_index)?.as_utf8()?;
         let resolved_desc = res_method_file.cp_entry(resolved_method.descriptor_index)?.as_utf8()?;
         // Next, possibly change C
+        
         if (c.get_class_file().cp_entry(resolved_method.name_index)?.as_utf8()? != "<init>") && current_class.get_class_file().has_super() && ({
             // Figure out if c is a superclass of current_class
             let mut temp = Rc::clone(&current_class);
@@ -420,27 +428,18 @@ impl Instruction for InvokeSpecial {
             res
         })
         && ((c.get_class_file().access_flags().flags & flags::class::ACC_SUPER) > 0 ) {
-            c = jvm.resolve_class_reference(c.get_class_file().super_name().unwrap())?;
+            c = jvm.resolve_class_reference(current_class.get_class_file().super_name().unwrap())?;
         }
-        let mut actual_method_wrapped = Some(resolved_method);
-        let mut actual_class = Rc::clone(&resolved_method_class);
+
+        let mut actual_method_wrapped = None;
         // Now, select *actual* method
         // All methods have to be instance methods. 
         // First, check methods of c for a method with the same name and desc.
-        for method in c.get_class_file().methods() {
-            if (method.access_flags.flags & flags::method::ACC_STATIC) > 0 {
-                continue;
-            }
-            if (c.get_class_file().cp_entry(method.name_index)?.as_utf8()? == resolved_name) && (c.get_class_file().cp_entry(method.descriptor_index)?.as_utf8()? == resolved_desc) {
-                actual_method_wrapped = Some(method.clone());
-                actual_class = Rc::clone(&c);
-                break;
-            }
-        }
-        // Check superclasses, if c is a class
-        if actual_method_wrapped.is_none() & ((c.get_class_file().access_flags().flags & flags::class::ACC_INTERFACE) == 0) {
+        // and Check superclasses, if c is a class
+        if actual_method_wrapped.is_none() && ((c.get_class_file().access_flags().flags & flags::class::ACC_INTERFACE) == 0) {
             let mut c_super = Rc::clone(&c);
-            while c_super.get_class_file().has_super() {
+            let mut found = false;
+            while !found {
                 for method in c.get_class_file().methods() {
                     if (method.access_flags.flags & flags::method::ACC_STATIC) > 0 {
                         continue;
@@ -448,15 +447,20 @@ impl Instruction for InvokeSpecial {
                     if (c_super.get_class_file().cp_entry(method.name_index)?.as_utf8()? == resolved_name) && 
                         (c_super.get_class_file().cp_entry(method.descriptor_index)?.as_utf8()? == resolved_desc) {
                         actual_method_wrapped = Some(method.clone());
-                        actual_class = Rc::clone(&c_super);
+                        c = Rc::clone(&c_super);
+                        found = true;
                         break;
                     }
                 }
-                c_super = jvm.resolve_class_reference(c_super.get_class_file().super_name().unwrap())?;
+                if !found {
+                    if !c_super.get_class_file().has_super() { break; }
+
+                    c_super = jvm.resolve_class_reference(c_super.get_class_file().super_name().unwrap())?;
+                }
             }
         }
         // Check object, if c in an interface.
-        if actual_method_wrapped.is_none() & ((c.get_class_file().access_flags().flags & flags::class::ACC_INTERFACE) > 0) {
+        if actual_method_wrapped.is_none() && ((c.get_class_file().access_flags().flags & flags::class::ACC_INTERFACE) > 0) {
             let obj_class = jvm.resolve_class_reference("java/lang/Object")?;
             for method in obj_class.get_class_file().methods() {
                 if (method.access_flags.flags & flags::method::ACC_STATIC) > 0 {
@@ -465,7 +469,7 @@ impl Instruction for InvokeSpecial {
                 if (obj_class.get_class_file().cp_entry(method.name_index)?.as_utf8()? == resolved_name) && 
                    (obj_class.get_class_file().cp_entry(method.descriptor_index)?.as_utf8()? == resolved_desc) {
                     actual_method_wrapped = Some(method.clone());
-                    actual_class = Rc::clone(&obj_class);
+                    c = Rc::clone(&obj_class);
                     break;
                 }
             }
@@ -474,6 +478,8 @@ impl Instruction for InvokeSpecial {
 
         // I *think* the way this works is that if we don't find a method, we use the one we resolved.
         let actual_method = actual_method_wrapped.unwrap();
+
+
         if (actual_method.access_flags.flags & flags::method::ACC_STATIC) > 0 {
             return Err(Error::IncompatibleClassChangeError(Opcode::INVOKESPECIAL));
         } 
@@ -502,7 +508,7 @@ impl Instruction for InvokeSpecial {
             }
         } 
         // TODO: Refactor jvm.setup_method_call() to handle native methods and synchronized ones (and rename it).
-        jvm.execute_on_object(&actual_method, actual_class)
+        jvm.execute_on_object(&actual_method, c)
     }
     fn as_any(&self) -> &dyn Any {
         self

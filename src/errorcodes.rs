@@ -214,6 +214,7 @@ pub enum Opcode {
     MethodInvoke,
     NewObject,
     NativeMethod,
+    Unknown,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -282,7 +283,8 @@ pub enum Error {
     MissingBootstrapTable(Opcode),
     NativeMethodCodeAccess,
     NegativeArraySizeException(Opcode),
-    NoClassDefFoundError(Opcode),
+    NoClassDefFoundError(Opcode, String),
+    NotEnoughBytes(Opcode),
     NotEnoughDimensionValues,
     None,
     NoSuchFieldError(Opcode),

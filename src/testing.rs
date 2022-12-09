@@ -1,5 +1,6 @@
 use std::{process::Command, time::Instant};
 
+use paste::paste;
 
 pub fn test_chapter(chap: &str, file: &str) {
     let mut s = String::from(".");
@@ -15,7 +16,7 @@ pub fn test_chapter(chap: &str, file: &str) {
 
     let expected = Command::new("java").arg("-cp").arg(path).arg(file).output().expect("Failed to run java file from cli");
 
-    let actual = Command::new("./target/release/rust-jvm").arg("-r").arg(true_file).output().expect("Failed to run jvm");
+    let actual = Command::new("./target/release/cmd").arg("-r").arg(true_file).output().expect("Failed to run jvm");
     
     assert_eq!(expected, actual);
 }
@@ -37,7 +38,7 @@ pub fn test_chapter_timed(chap: &str, file: &str) {
     let time_after_java = Instant::now(); 
 
     let time_before_jvm = Instant::now();
-    let actual = Command::new("./target/release/rust-jvm").arg("-r").arg(true_file).output().expect("Failed to run jvm");
+    let actual = Command::new("./target/release/cmd").arg("-r").arg(true_file).output().expect("Failed to run jvm");
     let time_after_jvm = Instant::now(); 
 
     assert_eq!(expected, actual);
@@ -59,7 +60,7 @@ pub fn test_file(path: &str, file: &str) {
 
     let expected = Command::new("java").arg("-cp").arg(path).arg(file).output().expect("Failed to run java file from cli");
 
-    let actual = Command::new("./target/release/rust-jvm").arg("-r").arg(true_file).output().expect("Failed to run jvm");
+    let actual = Command::new("./target/release/cmd").arg("-r").arg(true_file).output().expect("Failed to run jvm");
     
     assert_eq!(expected, actual);
 }
@@ -81,7 +82,7 @@ pub fn test_file_timed(path: &str, file: &str) {
     let time_after_java = Instant::now(); 
 
     let time_before_jvm = Instant::now();
-    let actual = Command::new("./target/release/rust-jvm").arg("-r").arg(true_file).output().expect("Failed to run jvm");
+    let actual = Command::new("./target/release/cmd").arg("-r").arg(true_file).output().expect("Failed to run jvm");
     let time_after_jvm = Instant::now(); 
 
     assert_eq!(expected, actual);
@@ -89,92 +90,70 @@ pub fn test_file_timed(path: &str, file: &str) {
     assert!(time_after_jvm.duration_since(time_before_jvm) < time_after_java.duration_since(time_before_java));
 }
 
-mod ch01 {
+macro_rules! add_test_and_time {
+    ($name:ident) => {
+        #[test]
+        fn $name() {
+            let mut name = String::from(stringify!($name));
+            name.as_mut_str()[0..1].make_ascii_uppercase();
+
+            while let Some(idx) = name.find("_") {
+                name.as_mut_str()[idx + 1..idx + 2].make_ascii_uppercase();
+                name.replace_range(idx..idx+1, "");
+            }
+
+
+            test_chapter(&module_path!()[module_path!().rfind(":").unwrap() + 1..], 
+                name.as_str());
+        }
+        paste! {
+            #[test]
+            fn [<$name _timed>] () {
+                let mut name = String::from(stringify!($name));
+                name.as_mut_str()[0..1].make_ascii_uppercase();
+
+                while let Some(idx) = name.find("_") {
+                    name.as_mut_str()[idx + 1..idx + 2].make_ascii_uppercase();
+                    name.replace_range(idx..idx+1, "");
+                }
+
+                test_chapter_timed(&module_path!()[module_path!().rfind(":").unwrap() + 1..], 
+                    name.as_str());
+            }
+        }     
+    };
+}
+
+mod book {
     use super::*;
-    #[test]
-    fn hello() {
-        test_chapter("ch01", "Hello")
+    mod ch01 {
+        use super::*;
+        add_test_and_time!(hello);
+        add_test_and_time!(hello2);
+        add_test_and_time!(hello3);
+        add_test_and_time!(goodbye);
     }
-    #[test]
-    fn hello_timed() {
-        test_chapter_timed("ch01", "Hello")
-    } 
-    #[test]
-    fn hello2() {
-        test_chapter("ch01", "Hello2")
-    } 
-    #[test]
-    fn hello2_timed() {
-        test_chapter_timed("ch01", "Hello2")
+    mod ch02 {
+        use super::*;
+        add_test_and_time!(declare_assign); 
+        add_test_and_time!(floating_point);
+        add_test_and_time!(hello);
+        add_test_and_time!(memory_diagram);
+        add_test_and_time!(printing_vars);
+        add_test_and_time!(string_concat);
     }
-    #[test]
-    fn hello3() {
-        test_chapter("ch01", "Hello3")
-    }
-    #[test]
-    fn hello3_timed() {
-        test_chapter_timed("ch01", "Hello3")
-    } 
-    #[test]
-    fn goodbye() {
-        test_chapter("ch01", "Goodbye")
-    }
-    #[test]
-    fn goodbye_timed() {
-        test_chapter_timed("ch01", "Goodbye")
+    mod ch03 {
+        use super::*;
+        add_test_and_time!(convert);
+        add_test_and_time!(echo);
+        add_test_and_time!(formatting);
+        add_test_and_time!(guess_starter);
+        add_test_and_time!(literals);
+        add_test_and_time!(scanner_bug);
     }
 }
-mod ch02 {
-    use super::*;
-    #[test]
-    fn declare_assign() {
-        test_chapter("ch02", "DeclareAssign")
-    }
-    #[test]
-    fn declare_assign_timed() {
-        test_chapter_timed("ch02", "DeclareAssign")
-    } 
-    #[test]
-    fn floating_point() {
-        test_chapter("ch02", "FloatingPoint")
-    }
-    #[test]
-    fn floating_point_timed() {
-        test_chapter_timed("ch02", "FloatingPoint")
-    } 
-    #[test]
-    fn hello() {
-        test_chapter("ch02", "Hello")
-    }
-    #[test]
-    fn hello_timed() {
-        test_chapter_timed("ch02", "Hello")
-    } 
-    #[test]
-    fn memory_diagram() {
-        test_chapter("ch02", "MemoryDiagram")
-    }
-    #[test]
-    fn memory_diagram_timed() {
-        test_chapter_timed("ch02", "MemoryDiagram")
-    } 
-    #[test]
-    fn printing_vars() {
-        test_chapter("ch02", "PrintingVars")
-    }
-    #[test]
-    fn printing_vars_timed() {
-        test_chapter_timed("ch02", "PrintingVars")
-    } 
-    #[test]
-    fn string_concat() {
-        test_chapter("ch02", "StringConcat")
-    }
-    #[test]
-    fn string_concat_timed() {
-        test_chapter_timed("ch02", "StringConcat")
-    } 
-}
+
+
 
 mod speed {
     use super::*;

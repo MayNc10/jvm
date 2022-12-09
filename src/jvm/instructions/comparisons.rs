@@ -904,12 +904,13 @@ impl Instruction for IfACmpNe {
                 Some(v) => v,
                 None => return Err(Error::StackUnderflow(Opcode::IFICMPNE)),
             };
-            !match Reference::ptr_eq(&val1.as_reference()?, &val2.as_reference()?) {
+            match !Reference::ptr_eq(&val1.as_reference()?, &val2.as_reference()?) {
                 true => self.offset,
                 false => 1,
             }
         };
         thread.inc_pc(offset)?;
+        println!("IFACmpNe took us to {}", thread.pc());
         Ok(())
     }
     compress_addr!{offset}

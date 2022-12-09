@@ -27,7 +27,7 @@ impl Instruction for Goto {
     }
     compress_addr!{offset}
     fn as_any(&self) -> &dyn Any {
-        self
+        self 
     }
     fn eq(&self, other: &dyn Instruction) -> bool {
         match other.as_any().downcast_ref::<Goto>() {
@@ -128,27 +128,30 @@ impl Instruction for TableSwitch {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
+            true_pc += 1; // Skip past opcode
             while true_pc % 4 != 0 {
                 v.remove(0);
                 true_pc += 1;
             }
             let default = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap())
-            };
+                i32::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap())
+            } as isize;
             let low = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap())
-            };
+                i32::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap())
+            } as isize;
             let high = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap())
-            };
+                i32::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap())
+            } as isize;
             v.remove(0); v.remove(0); v.remove(0); v.remove(0); 
             v.remove(0); v.remove(0); v.remove(0); v.remove(0);
             v.remove(0); v.remove(0); v.remove(0); v.remove(0);
-            let mut j_offsets = Vec::with_capacity((high - low + 1) as usize / 4).into_boxed_slice();
+            let mut j_offsets = Vec::with_capacity((high - low + 1) as usize);
+            unsafe { j_offsets.set_len(j_offsets.capacity()); }
+            let mut j_offsets =  j_offsets.into_boxed_slice();
             for idx in 0..(high - low + 1) as usize {
                 j_offsets[idx] = unsafe {
-                    isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap())
-                };
+                    i32::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap())
+                } as isize;
                 v.remove(0); v.remove(0); v.remove(0); v.remove(0); 
             }
             Ok(TableSwitch { default, low, high, j_offsets })
@@ -194,23 +197,32 @@ impl Instruction for LookupSwitch {
         if was_wide {
             Err(Error::IllegalWide)
         } else {
+            true_pc += 1; // Skip past opcode
             while true_pc % 4 != 0 {
                 v.remove(0);
                 true_pc += 1;
             }
             let default = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap())
-            };
+                i32::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap())
+            } as isize;
+            v.remove(0); v.remove(0); v.remove(0); v.remove(0);
             let npairs = unsafe {
-                isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap())
-            };           
+                i32::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap())
+            } as isize;            
             v.remove(0); v.remove(0); v.remove(0); v.remove(0); 
-            let mut pairs = Vec::with_capacity(npairs as usize).into_boxed_slice();
+            let mut pairs = Vec::with_capacity(npairs as usize);
+            unsafe { pairs.set_len(pairs.capacity()); }
+            let mut pairs =  pairs.into_boxed_slice();
             for idx in 0..npairs as usize {
+                if v.len() < 8 { 
+                    return Err(Error::NotEnoughBytes(Opcode::LOOKUPSWITCH));
+                 }
+
                 pairs[idx] = unsafe {
                     (i32::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap()),
-                     isize::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 4).try_into().unwrap()))
+                     i32::from_be_bytes(std::slice::from_raw_parts(v.as_ptr().offset(4), 4).try_into().unwrap()) as isize)
                 };
+                v.remove(0); v.remove(0); v.remove(0); v.remove(0); 
                 v.remove(0); v.remove(0); v.remove(0); v.remove(0); 
             }
             Ok(LookupSwitch { default, pairs})
@@ -223,7 +235,7 @@ impl Instruction for LookupSwitch {
             let frame = access_macros::current_frame_mut!(thread);
             let key = match frame.op_stack.pop() {
                 Some(v) => *v.as_int()?,
-                None => return Err(Error::StackUnderflow(Opcode::TABLESWITCH)),
+                None => return Err(Error::StackUnderflow(Opcode::LOOKUPSWITCH)),
             };
             match self.pairs.binary_search_by_key(&key, |&(m, _)| m) {
                 Ok(idx) => self.pairs[idx].1,
@@ -447,7 +459,7 @@ impl Instruction for AReturn {
         // This needs a lot of love
         let return_value = {
             let frame = access_macros::current_frame_mut!(thread);
-            // This case needs to be fixed, see: https://docs.oracle.com/javase/specs/jls/se18/html/jls-5.html#jls-5.1.8
+            // This case needs to be fixed, see: https://docs.oracle.com/javase/specs/jls/se17/html/jls-5.html#jls-5.1.8
             if !frame.current_method.returns_reference(&frame.rt_const_pool.get_class_file())? {
                 return Err(Error::IncompatibleReturnType(Opcode::ARETURN));
             }   
@@ -455,7 +467,7 @@ impl Instruction for AReturn {
                 Some(v) => v,
                 None => return Err(Error::StackUnderflow(Opcode::ARETURN)),
             };
-            frame.op_stack = Vec::new();
+            frame.op_stack.clear();
             let current_class = Rc::clone(&frame.rt_const_pool);
             let current_class_file = current_class.get_class_file();
             {

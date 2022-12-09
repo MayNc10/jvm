@@ -91,9 +91,6 @@ pub fn parse_args(args: &[String]) -> Result<Cli, ParseError> {
     let mut missing_file = args.is_empty();
     if !missing_file {
         fname = args.last().unwrap().clone();
-        if classpath.is_some() {
-            fname = classpath.as_ref().unwrap().clone() + &fname;
-        }
         if ftype == FileType::Class {
             if fname.len() <= 6 {
                 missing_file = true;

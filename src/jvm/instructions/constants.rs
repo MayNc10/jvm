@@ -2,6 +2,8 @@ use crate::reference::object::natives;
 use crate::reference::object::Object;
 use super::*;
 
+use colored::Colorize;
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Nop {}
 impl Instruction for Nop {
@@ -171,6 +173,24 @@ impl Instruction for IConst2 {
             None => false,
             Some(other) => self == other,
         }
+    }
+    fn can_jit(&self) -> bool { true }
+    #[cfg(not(target_family = "wasm"))]
+    fn jit(&self, context: &'static Context, module: &Module<'static>, builder: &Builder<'static>, 
+                engine: &ExecutionEngine<'static>, name: &String, func: FunctionValue, 
+                locals: &Vec<PointerValue>, blocks: &HashMap<usize, BasicBlock>, stack: &PointerValue, top: &PointerValue) 
+    {
+        builder.build_store(unsafe {
+            builder.build_in_bounds_gep(*stack, &[
+                builder.build_load(*top, "top_idx").into_int_value()
+            ], "stack_idx")
+        }, context.i32_type().const_int(2, false));
+
+        builder.build_store(*top, 
+            builder.build_load(*top, "top_idx").into_int_value().const_add(
+                context.i64_type().const_int(1, false)
+            ), 
+        );
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -673,8 +693,14 @@ pub mod ldc {
     #[derive(Debug, PartialEq, Clone)]
     pub struct LDCTodo {}
     impl LDCFunc for LDCTodo {
-        fn execute(&mut self, _jvm : &mut JVM) -> Result<(), Error> {
-            todo!("ldc not implemented");
+        fn execute(&mut self, jvm : &mut JVM) -> Result<(), Error> {
+            // Just to try to get farther
+            eprintln!("{}", "WARNING: LDCTodo called, attempting to fudge results".red());
+
+            let thread = access_macros::current_thread_mut!(jvm);
+            let frame = access_macros::current_frame_mut!(thread);
+            frame.op_stack.push(Value::Reference(Reference::Null)); // The only unimplemented ldcs are reference ones.
+            Ok(())
         }
         comparable!{}
     }
@@ -750,7 +776,7 @@ impl Instruction for Ldc {
                 },
                 Entry::Long(_) | Entry::Double(_) => {
                     // Even though these are loadable, they shouldn't appear here
-                    return Err(Error::IllegalConstantLoad(Opcode::LDCW));
+                    return Err(Error::IllegalConstantLoad(Opcode::LDC));
                 },
                 _ => {
                     return Err(Error::IllegalConstantLoad(Opcode::LDC));
@@ -794,7 +820,8 @@ impl Instruction for LdcW {
             // First, get the constant pool entry at that index.
             let entry = &cpool[unsafe {
                 u16::from_be_bytes(std::slice::from_raw_parts(v.as_ptr(), 2).try_into().unwrap())
-            } as usize];
+            } as usize - 1];
+            
             let f = match entry {
                 Entry::Integer(i) => Box::new(ldc::LDCInt {i: *i}) as Box<dyn ldc::LDCFunc>,
                 Entry::Float(f) => Box::new(ldc::LDCFloat {f: *f}) as Box<dyn ldc::LDCFunc>,
@@ -819,6 +846,12 @@ impl Instruction for LdcW {
                     // This one is incredibly complicated, but should result in a java.lang.invoke.MethodHandle.
                     Box::new(ldc::LDCTodo {}) as Box<dyn ldc::LDCFunc>
                 },
+                /* 
+                Entry::MethodRef(_r) => {
+                    // Apparently this is allowed?
+                    Box::new(ldc::LDCTodo {}) as Box<dyn ldc::LDCFunc>
+                }
+                */
                 Entry::Dynamic(_dynamic) => {
                     // This Dynamic cannot reference a field with discriptor Long or Double.
     

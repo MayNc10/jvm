@@ -9,14 +9,20 @@ use crate::value::{Value, VarValue};
 
 use std::any::Any;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::rc::Rc;
 
 use dyn_clone::*;
-use inkwell::builder::Builder;
-use inkwell::context::Context;
-use inkwell::execution_engine::{ExecutionEngine, JitFunction};
-use inkwell::module::Module;
-use inkwell::values::FunctionValue;
+#[cfg(not(target_family = "wasm"))]
+use {
+    inkwell::basic_block::BasicBlock,
+    inkwell::builder::Builder,
+    inkwell::context::Context,
+    inkwell::execution_engine::{ExecutionEngine, JitFunction},
+    inkwell::module::Module,
+    inkwell::values::{FunctionValue, PointerValue, IntValue},
+
+};
 
 pub mod constants;
 pub mod loads;
@@ -44,19 +50,23 @@ macro_rules! compress_addr {
 pub trait Instruction : core::fmt::Debug + DynClone {
     fn name(&self) -> &'static str;
     fn new(_v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, _was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized;
-    fn execute(&mut self, _ : &mut JVM) -> Result<(), Error> {
+    #[inline] fn execute(&mut self, _ : &mut JVM) -> Result<(), Error> {
         panic!("TODO execution not implemented for {}", self.name());
     }
     fn compress_range(&mut self, _this_pc: usize, _translation_map: &HashMap<usize, usize>) {}
     fn as_any(&self) -> &dyn Any;
     fn eq(&self, other: &dyn Instruction) -> bool;
 
-    fn can_jit(&self) -> bool {false}
+    fn can_jit(&self) -> bool { false }
     // A very basic jit outline, without support for control flow. 
+    #[cfg(not(target_family = "wasm"))]
     fn jit(&self, context: &'static Context, module: &Module<'static>, builder: &Builder<'static>, 
-            engine: &ExecutionEngine<'static>, name: &String, func: FunctionValue) {
+            engine: &ExecutionEngine<'static>, name: &String, func: FunctionValue, 
+            locals: &Vec<PointerValue>, blocks: &HashMap<usize, BasicBlock>, stack: &PointerValue, top: &PointerValue) {
         panic!("Attempted to jit a non-jitable instruction");
     }
+    
+    fn is_control_flow(&self) -> bool { false }
 }
 
 impl std::fmt::Display for dyn Instruction {
@@ -74,7 +84,7 @@ clone_trait_object!(Instruction);
 
 pub fn new_instruction(v: &mut Vec<u8>, c: &Vec<Entry>, jvm: &mut JVM, was_wide: bool, true_pc: usize) -> Result<Box<dyn Instruction>, Error> {
     let op = v[0];
-    //println!("Creating op {}", op);
+    // println!("Creating op {}", op);
     v.remove(0);
     match op {
         0 => Ok(Box::new(constants::Nop::new(v, c, jvm, was_wide, true_pc)?) as Box<dyn Instruction>),

@@ -2,14 +2,23 @@
 name = "rust-jvm"
 version = "0.1.0"
 edition = "2021"
+default-run = "cmd"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "app"
+path = "src/app/bin/main.rs"
+
+[[bin]]
+name = "cmd"
+path = "src/main.rs"
 
 [profile.release]
 lto = true
 panic = "abort"
 codegen-units = 1
-#debug = true
+debug = true
 
 [profile.bench]
 debug = true
@@ -20,7 +29,19 @@ dyn-clone = "1.0.9"
 send_wrapper = "0.6.0"
 once_cell = "1.16.0"
 colored = "2.0.0"
+js-sys = "0.3"
 yew = { version = "0.20.0", features = ["csr"] }
+base64 = "0.13.0"
+gloo = "0.8"
+gloo-console = "0.2.3"
+lazy_static = "1.4"
+wasm-bindgen = "0.2.83"
+
+
+[dependencies.web-sys]
+version = "0.3"
+features = ["File", "DragEvent", "DataTransfer"]
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm12-0"] }
+

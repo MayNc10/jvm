@@ -150,21 +150,9 @@ impl MethodInfo {
         Ok(&descriptor[return_start..])
     }
     pub fn num_args(&self, current_class: &Rc<ClassFile>) -> Result<usize, Error> {
-        let mut desc = current_class.cp_entry(self.descriptor_index)?.as_utf8()?.as_str();
-        desc = &desc[0..desc.rfind(')').unwrap()];
-        desc = &desc[1..desc.len()];
-        let mut num = 0;
-        while !desc.is_empty() {
-            num += 1;
-            let base = if &desc[0..1] == "L" {
-                desc.find(';').unwrap() + 1
-            }
-            else {
-                1
-            };
-            desc = &desc[base..desc.len()];
-        }
-        Ok(num)
+        let desc = current_class.cp_entry(self.descriptor_index)?.as_utf8()?.as_str();
+        // This is slow but will work for now
+        Ok(JVM::parse_descriptor(desc)?.0.len())
     }
 
 }
@@ -1146,9 +1134,12 @@ impl ClassFile {
     /// This function *can* be called multiple times, but *should* only be called once on a classfile generated from 'new()'
     pub fn init_code(&mut self, op_bytes_vec: Vec<Vec<u8>>, jvm: &mut JVM) -> Result<(), Error> {
         //let is_main_class = self.name() == jvm.m_main_class_name;
-        let mut op_bytes_vec = op_bytes_vec.into_iter();
 
-        for code in self.methods.iter_mut().filter_map(|m| m.code.as_mut()) {
+        let mut op_bytes_vec = op_bytes_vec.into_iter();
+        let self_ptr = self as *const ClassFile;
+
+        for (code, name, desc) in 
+            self.methods.iter_mut().filter_map(|m| Some((m.code.as_mut()?, m.name_index, m.descriptor_index))) {
             let mut op_bytes = op_bytes_vec.next().unwrap();
             let mut true_pc = 0;
             let mut was_wide = false;
@@ -1160,15 +1151,23 @@ impl ClassFile {
                 match instructions::new_instruction(&mut op_bytes, &self.constant_pool, jvm, was_wide, true_pc) {
                     Err(Error::Wide) => was_wide = true,
                     Err(e) => {
-                        println!("Currently resolved code: ");
+                        println!("Currently resolved code in method {}.{}{}: ",
+                            unsafe { (*self_ptr).name() }, 
+                            unsafe {(*self_ptr).cp_entry(name)?.as_utf8()?},
+                            unsafe {(*self_ptr).cp_entry(desc)?.as_utf8()?}
+                        );
                         for op in &code.code {
                             println!("{}", op.name());
                         }
+                        panic!("Hit error: {:?}", e);
                         return Err(e);
                     },
                     Ok(instruction) => {
                         addr_hmap.insert(true_pc, true_pc - base_compress);
                         true_pcs.push(true_pc);
+                        
+                        // println!("found instruction {instruction}");
+
                         code.code.push(instruction);
                         true_pc += old_len - op_bytes.len();
                         base_compress += (old_len - 1) - op_bytes.len();
@@ -1176,11 +1175,12 @@ impl ClassFile {
                     },
                 }
             }
+            // println!("Compressing ranges");
             let mut true_pcs = true_pcs.into_iter();
             for instruction in &mut code.code {
                 instruction.compress_range(true_pcs.next().unwrap(), &addr_hmap);
             }
-        }      
+        }    
         Ok(())
     }
     /// # Safety

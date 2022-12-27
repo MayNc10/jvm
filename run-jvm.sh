@@ -1,2 +1,2 @@
 #!/bin/bash
-cargo r -- -r -db $1.class
+cargo r --release -- -r -db $1.class

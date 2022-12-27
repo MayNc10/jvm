@@ -492,7 +492,7 @@ impl Instruction for BiPush {
     fn new(v: &mut Vec<u8>, _cpool: &Vec<Entry>, _jvm: &mut JVM, was_wide: bool, _true_pc: usize) -> Result<Self, Error> where Self : Sized {
         let b = v.remove(0);      
         if !was_wide {
-            Ok(BiPush { byte: b as i32})
+            Ok(BiPush { byte: b as i8 as i32}) // the 'as i8' accounts for negative numbers
         } else {
             Err(Error::IllegalWide)
         }

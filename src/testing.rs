@@ -151,6 +151,18 @@ mod book {
         add_test_and_time!(literals);
         add_test_and_time!(scanner_bug);
     }
+    mod ch04 {
+        use super::*;
+        add_test_and_time!(baffle);
+        add_test_and_time!(circle);
+        add_test_and_time!(distance);
+        add_test_and_time!(math_methods);
+        add_test_and_time!(new_line);
+        add_test_and_time!(print_time);
+        add_test_and_time!(print_twice);
+        add_test_and_time!(wugga);
+        add_test_and_time!(zoop);
+    }
 }
 
 

@@ -201,8 +201,9 @@ impl Class for CustomClass {
         
         // Use jvm::parse_descriptor
         let (local_types, _) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index)?.as_utf8()?)?;
-        let mut new_frame = Frame::new(self.clone(), method.clone(), 
-            method.code.as_ref().unwrap().max_locals.into());
+        let mut new_frame = Frame::new_with_stack_size(self.clone(), method.clone(), 
+            method.code.as_ref().unwrap().max_locals.into(),
+            method.code.as_ref().unwrap().max_stack.into());
         let locals = &mut new_frame.local_variables;
         
         if local_types.len() > 0 {

@@ -451,7 +451,7 @@ impl JVM {
 
 impl JVM {
     pub fn step1(&mut self) {
-        let (opcode) = { //, cname, name, desc, pc) = {
+        let (opcode) = {//, cname, name, desc, pc) = {
             let thread = current_thread_mut!(self);
             if thread.m_stack.is_empty() {
                 self.m_has_halted = true;
@@ -956,8 +956,9 @@ impl JVM {
         // Use jvm::parse_descriptor
         let (local_types, _) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index)?.as_utf8()?)?;
 
-        let mut new_frame = Frame::new(c.clone(), method.clone(), 
-            method.code.as_ref().unwrap().max_locals.into()); // Should take into account implicit 'this'.
+        let mut new_frame = Frame::new_with_stack_size(c.clone(), method.clone(), 
+            method.code.as_ref().unwrap().max_locals.into(),
+            method.code.as_ref().unwrap().max_stack.into()); // Should take into account implicit 'this'.
         let locals = &mut new_frame.local_variables; 
         let base = !is_static as usize;
         

@@ -211,8 +211,9 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
         let c_file = new_method_class.get_class_file();
         // Use jvm::parse_descriptor
         let (local_types, _) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index)?.as_utf8()?)?;
-        let mut new_frame = Frame::new(new_method_class.as_dyn_rc(), method.clone(), 
-            method.code.as_ref().unwrap().max_locals.into()); // Should take into account implicit 'this'.
+        let mut new_frame = Frame::new_with_stack_size(new_method_class.as_dyn_rc(), method.clone(), 
+            method.code.as_ref().unwrap().max_locals.into(),
+            method.code.as_ref().unwrap().max_stack.into()); // Should take into account implicit 'this'.
         let locals = &mut new_frame.local_variables; 
         // Account for implicit 'this'
         let mut val_idx: usize = local_types.len(); 

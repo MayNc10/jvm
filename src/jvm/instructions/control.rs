@@ -472,6 +472,7 @@ impl Instruction for AReturn {
             let current_class_file = current_class.get_class_file();
             {
                 let ret_descriptor = frame.current_method.return_descriptor(&current_class_file)?;
+                let ret_class_name = &ret_descriptor[1..ret_descriptor.len() - 1];
                 let ret_ref = ret_val.as_reference()?;
                 // This is my understanding of the rules regarding reference type assignment compatibility:
                 // If a type is Null, it matches with any reference type. 
@@ -486,7 +487,7 @@ impl Instruction for AReturn {
                 match ret_ref {
                     Reference::Null => (),
                     Reference::Array(_a, _) => {
-                        if !((ret_descriptor.as_bytes()[0] as char == '[') | (ret_descriptor == "java/Lang/Object")) {
+                        if !((ret_descriptor.as_bytes()[0] as char == '[') | (ret_descriptor == "java/lang/Object")) {
                             return Err(Error::IncompatibleReturnType(Opcode::ARETURN));
                         }
                     },
@@ -496,7 +497,7 @@ impl Instruction for AReturn {
                         let mut found = false;
                         // These nested loops are rough, they should be tested and probably refactored.
                         while current_class_file.has_super() && !found {
-                            if current_class_file.name() == ret_descriptor {
+                            if current_class_file.name() == ret_class_name {
                                 found = true;
                                 break;
                             }
@@ -505,7 +506,7 @@ impl Instruction for AReturn {
                                 let mut current_interface = jvm.resolve_class_reference(current_class_file.cp_entry(*interface)?.as_utf8()?)?;
                                 let mut found_interface = false;
                                 while current_interface.get_class_file().has_super() {
-                                    if current_interface.get_class_file().name() == ret_descriptor {
+                                    if current_interface.get_class_file().name() == ret_class_name {
                                         found_interface = true;
                                         break;
                                     }
@@ -528,7 +529,7 @@ impl Instruction for AReturn {
                         let mut found = false;
                         // These nested loops are rough, they should be tested and probably refactored.
                         while current_interface.get_class_file().has_super() && !found {
-                            if current_interface.get_class_file().name() == ret_descriptor {
+                            if current_interface.get_class_file().name() == ret_class_name {
                                 found = true;
                                 break;
                             }

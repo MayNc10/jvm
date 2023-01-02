@@ -6,7 +6,7 @@ use self::classfile::{MethodInfo, ClassFile};
 
 pub mod classfile;
 pub mod customclass;
-pub mod system;
+pub mod natives;
  
 pub trait Class {
     fn new(file: classfile::ClassFile, jvm: &mut JVM) -> Result<Self, Error> where Self : Sized;
@@ -32,7 +32,10 @@ impl PartialEq for dyn Class {
 
 pub fn new_class(file: classfile::ClassFile, jvm: &mut JVM) -> Result<Rc<dyn Class>, Error> {
     match file.name() {
-        "java/lang/System" => Ok(Rc::new(system::System::new(file, jvm)?)),
+        "java/lang/System" => Ok(Rc::new(natives::system::System::new(file, jvm)?)),
+        "java/lang/StrictMath" => Ok(Rc::new(natives::strict_math::StrictMath::new(file, jvm)?)),
+        "java/lang/Double" => Ok(Rc::new(natives::double::Double::new(file, jvm)?)),
+        "java/lang/Math" => Ok(Rc::new(natives::math::Math::new(file, jvm)?)),
         _ => Ok(Rc::new(customclass::CustomClass::new(file, jvm)?)),
     }
 }

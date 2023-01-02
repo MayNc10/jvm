@@ -238,11 +238,12 @@ impl Instruction for InvokeVirtual {
             (jvm.resolve_class_reference(c_name.clone().as_str())?, name, descriptor)
         };
         let c_file = c.get_class_file();
+        //println!("Got {}.{}{}", c_file.name(), name, descriptor);
         let mut method_to_call = None; 
         // Resolve method
         {
             let mut found = false;
-            while c_file.has_super() && !found {
+            'super_loop: while !found {
                 for method in c_file.methods() {
                     // https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-5.html#jvms-5.4.3.3
                     // We still need to check for signature polymorphic functions.
@@ -259,13 +260,14 @@ impl Instruction for InvokeVirtual {
                 }   
                 // Recurse up the inheritance tree.
                 if !found {
+                    if !c.get_class_file().has_super() { break 'super_loop; }
                     c = jvm.resolve_class_reference(c.get_class_file().super_name().unwrap())?;
                 }
                 
             }
             // TODO: Search Superinterfaces of c.
             if !found {
-                return Err(Error::NoSuchMethodError(Opcode::MethodInvoke));
+                return Err(Error::NoSuchMethodError(Opcode::INVOKEVIRTUAL));
             }
         }
         
@@ -933,7 +935,7 @@ impl Instruction for AThrow {
                 Reference::Array(_, _) | Reference::Interface(_, _) => return Err(Error::IncorrectReferenceType(Opcode::ATHROW)),
                 Reference::Null => {
                     // We could pop the other exception here, but we already clear it in self.handle_exception, so there's not really a point.
-                    let exception = object::new_object("java/Lang/NullPointerException", jvm)?;
+                    let exception = object::new_object_with_name("java/Lang/NullPointerException", jvm)?;
                     let exception_class = exception.class().clone();
                     let exception_ref = Reference::Object(exception, Rc::new(Monitor::new()));
                     let exception_val = Value::Reference(exception_ref);

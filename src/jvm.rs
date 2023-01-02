@@ -13,6 +13,7 @@ use core::panic;
 
 #[cfg(not(target_family = "wasm"))]
 use inkwell::context::Context;
+use web_sys::ReadableStream;
 
 use std::collections::HashMap;
 use std::fs::{File, self};
@@ -451,7 +452,7 @@ impl JVM {
 
 impl JVM {
     pub fn step1(&mut self) {
-        let (opcode) = {//, cname, name, desc, pc) = {
+        let (opcode, cname, name, desc, pc) = {
             let thread = current_thread_mut!(self);
             if thread.m_stack.is_empty() {
                 self.m_has_halted = true;
@@ -460,12 +461,12 @@ impl JVM {
             let pc = thread.pc();
 
             let frame = current_frame_mut!(thread);
-            //let rt = frame.rt_const_pool.get_class_file();
-            //let cname = String::from(rt.name());
-            //let name = rt.cp_entry(frame.current_method.name_index).unwrap().as_utf8().unwrap().clone();
-            //let desc = rt.cp_entry(frame.current_method.descriptor_index).unwrap().as_utf8().unwrap().clone();
+            let rt = frame.rt_const_pool.get_class_file();
+            let cname = String::from(rt.name());
+            let name = rt.cp_entry(frame.current_method.name_index).unwrap().as_utf8().unwrap().clone();
+            let desc = rt.cp_entry(frame.current_method.descriptor_index).unwrap().as_utf8().unwrap().clone();
 
-            (frame.current_method.code_at_mut(pc))//, cname, name, desc, frame.pc)
+            (frame.current_method.code_at_mut(pc), cname, name, desc, frame.pc)
         };
         if let Err(e) = opcode {
             self.m_thrown_error = e;
@@ -954,19 +955,18 @@ impl JVM {
         // Fill out the local variables.
         let c_file = c.get_class_file();
         // Use jvm::parse_descriptor
-        let (local_types, _) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index)?.as_utf8()?)?;
+        let (local_types, _, real_max_locals) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index)?.as_utf8()?)?;
 
         let mut new_frame = Frame::new_with_stack_size(c.clone(), method.clone(), 
             method.code.as_ref().unwrap().max_locals.into(),
             method.code.as_ref().unwrap().max_stack.into()); // Should take into account implicit 'this'.
         let locals = &mut new_frame.local_variables; 
-        let base = !is_static as usize;
+        let base = is_static as usize;
         
         if local_types.len() > 0 {
-            let mut val_idx: usize = local_types.len() - 1;
+            let mut locals_idx = real_max_locals - base;
 
-            while val_idx > base {
-                let val = local_types[val_idx - base];
+            for val in local_types.iter().rev() {
                 match val {
                     ValueMarker::Byte => {
                         let current_frame = access_macros::current_frame_mut!(thread);
@@ -975,7 +975,7 @@ impl JVM {
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_int(val)?;
-                        locals[val_idx] = VarValue::Byte(inner_value);
+                        locals[locals_idx] = VarValue::Byte(inner_value);
                     },
                     ValueMarker::Char => {
                         let current_frame = access_macros::current_frame_mut!(thread);
@@ -984,18 +984,18 @@ impl JVM {
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_int(val)?;
-                        locals[val_idx] = VarValue::Char(inner_value);
+                        locals[locals_idx] = VarValue::Char(inner_value);
                     },
                     ValueMarker::Double => {
                         let current_frame = access_macros::current_frame_mut!(thread);
-                        locals[val_idx] = VarValue::DoubleHighBytes;
-                        val_idx -= 1;
+                        locals[locals_idx] = VarValue::DoubleHighBytes;
+                        locals_idx -= 1;
                         let val = match current_frame.op_stack.pop() {
                             Some(v) => v,
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_double(val)?;
-                        locals[val_idx] = VarValue::Double(inner_value);
+                        locals[locals_idx] = VarValue::Double(inner_value);
                     },
                     ValueMarker::Float => {
                         let current_frame = access_macros::current_frame_mut!(thread);
@@ -1004,7 +1004,7 @@ impl JVM {
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_float(val)?;
-                        locals[val_idx] = VarValue::Float(inner_value);
+                        locals[locals_idx] = VarValue::Float(inner_value);
                     },
                     ValueMarker::Int => {
                         let current_frame = access_macros::current_frame_mut!(thread);
@@ -1013,19 +1013,19 @@ impl JVM {
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_int(val)?;
-                        locals[val_idx] = VarValue::Int(inner_value);
+                        locals[locals_idx] = VarValue::Int(inner_value);
                         
                     },
                     ValueMarker::Long => {
                         let current_frame = access_macros::current_frame_mut!(thread);
-                        locals[val_idx] = VarValue::LongHighBytes;
-                        val_idx -=  1;
+                        locals[locals_idx] = VarValue::LongHighBytes;
+                        locals_idx -= 1;
                         let val = match current_frame.op_stack.pop() {
                             Some(v) => v,
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_long(val)?;
-                        locals[val_idx] = VarValue::Long(inner_value);
+                        locals[locals_idx] = VarValue::Long(inner_value);
                     },
                     ValueMarker::Short => {
                         let current_frame = access_macros::current_frame_mut!(thread);
@@ -1034,7 +1034,7 @@ impl JVM {
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_int(val)?;
-                        locals[val_idx] = VarValue::Short(inner_value);
+                        locals[locals_idx] = VarValue::Short(inner_value);
                     },
                     ValueMarker::Reference => {            
                         let val = {
@@ -1058,7 +1058,7 @@ impl JVM {
                             }
                         };
                         let inner_value = Value::to_reference(val)?;
-                        locals[val_idx] = VarValue::Reference(inner_value);
+                        locals[locals_idx] = VarValue::Reference(inner_value);
                     }
                     ValueMarker::Void => {
                         panic!("There shouldn't be void types in arguments");
@@ -1067,8 +1067,8 @@ impl JVM {
                         panic!("We shouldn't read top type");
                     },
                 }
-                val_idx -= 1;
-            } 
+                locals_idx -= 1;
+            }
         }
 
         if !is_static {
@@ -1146,6 +1146,7 @@ impl JVM {
         println!("Number of args: {}", num_args);
         */
         let mut obj_ref = frame.op_stack[frame.op_stack.len() - num_args - 1].as_reference()?;
+        let clone = obj_ref.clone();
         let mut obj_ref = Rc::clone(obj_ref.as_object_mut()?);
         let obj = unsafe { Rc::get_mut_unchecked(&mut obj_ref)};
         obj.exec_method(Rc::clone(&current_class), self, method)?;
@@ -1154,7 +1155,7 @@ impl JVM {
 }
 
 impl JVM {
-    pub fn parse_descriptor(mut desc: &str) -> Result<(Box<[ValueMarker]>, ValueMarker), Error> {
+    pub fn parse_descriptor(mut desc: &str) -> Result<(Box<[ValueMarker]>, ValueMarker, usize), Error> {
         let ret_val = match &desc[desc.rfind(')').unwrap() + 1..desc.rfind(')').unwrap() + 2] {
             "B" | "Z"=> ValueMarker::Byte,
             "C" => ValueMarker::Char,
@@ -1169,7 +1170,7 @@ impl JVM {
                 println!("{e}");
                 return Err(Error::IllegalDescriptor)},
         };
-
+        let mut real_num_locals = 0;
         desc = &desc[1..desc.find(')').unwrap()]; // Skip past the return value and first paren
         let mut args = Vec::new();
         while !desc.is_empty() {
@@ -1183,7 +1184,7 @@ impl JVM {
                 index -= 1;
             }
             if matches!(&desc[index..index + 1], "D" | "J") {
-                args.push(ValueMarker::Top);
+                real_num_locals += 1;
             }
             args.push(match &desc[index..index + 1] {
                 "B" | "Z"=> ValueMarker::Byte,
@@ -1196,10 +1197,11 @@ impl JVM {
                 "L" | "[" => ValueMarker::Reference,
                 _ => return Err(Error::IllegalDescriptor),
             }); 
+            real_num_locals += 1;
             desc = &desc[0..index];
         }
         args.reverse();
-        Ok((args.into_boxed_slice(), ret_val))
+        Ok((args.into_boxed_slice(), ret_val, real_num_locals))
     }
     pub fn box_primitive_name(&mut self, sym: &str) -> Result<&'static str, Error> {
         match sym {

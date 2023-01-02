@@ -12,6 +12,8 @@ use std::rc::Rc;
 
 use self::object::customobject::CustomObject;
 
+use colored::Colorize;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Monitor {
     pub owned_thread: usize,
@@ -92,7 +94,11 @@ impl Reference<dyn Class, dyn Object> {
         Reference::Interface(c, Rc::new(Monitor::new()))
     }
     pub fn new_object(current_class: Rc<dyn Class>, class_index: u16, jvm: &mut JVM) -> Result<Reference<dyn Class, dyn Object>, Error> {
-        Ok(Reference::Object(CustomObject::<dyn Class>::new(Some(current_class), Some(class_index), jvm)?, Rc::new(Monitor::new())))
+        Ok(Reference::Object(
+            object::new_object(Some(current_class), 
+            Some(class_index), 
+            jvm)?, 
+        Rc::new(Monitor::new())))
     }
 
     // Again, the runtime hit hurts, but we need to test while the design is still unstable, and I can't think of a better solution. 

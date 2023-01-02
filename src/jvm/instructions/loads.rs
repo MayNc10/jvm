@@ -146,7 +146,7 @@ impl Instruction for DLoad {
         let thread = access_macros::current_thread_mut!(jvm);
         let frame = access_macros::current_frame_mut!(thread);
         let var = &frame.local_variables[self.idx];
-        frame.op_stack.push(Value::Long(*var.as_long()?));
+        frame.op_stack.push(Value::Double(*var.as_double()?));
         Ok(())
     }
     fn as_any(&self) -> &dyn Any {

@@ -200,17 +200,20 @@ impl Class for CustomClass {
         // Fill out the local variables.
         
         // Use jvm::parse_descriptor
-        let (local_types, _) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index)?.as_utf8()?)?;
+        let (local_types, _, real_max_locals) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index)?.as_utf8()?)?;
         let mut new_frame = Frame::new_with_stack_size(self.clone(), method.clone(), 
             method.code.as_ref().unwrap().max_locals.into(),
             method.code.as_ref().unwrap().max_stack.into());
         let locals = &mut new_frame.local_variables;
-        
-        if local_types.len() > 0 {
-            let mut val_idx: usize = local_types.len();
 
-            while val_idx > 0 {
-                let val = local_types[val_idx - 1];
+        //let current_frame = access_macros::current_frame_mut!(thread);
+        //println!("New locals: {:?}", local_types);
+        //println!("Current stack: {:?}", current_frame.op_stack);
+
+        if local_types.len() > 0 {
+            let mut locals_idx = real_max_locals - 1;
+
+            for val in local_types.iter().rev() {
                 match val {
                     ValueMarker::Byte => {
                         let current_frame = access_macros::current_frame_mut!(thread);
@@ -219,7 +222,7 @@ impl Class for CustomClass {
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_int(val)?;
-                        locals[val_idx - 1] = VarValue::Byte(inner_value);
+                        locals[locals_idx] = VarValue::Byte(inner_value);
                     },
                     ValueMarker::Char => {
                         let current_frame = access_macros::current_frame_mut!(thread);
@@ -228,18 +231,18 @@ impl Class for CustomClass {
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_int(val)?;
-                        locals[val_idx - 1] = VarValue::Char(inner_value);
+                        locals[locals_idx] = VarValue::Char(inner_value);
                     },
                     ValueMarker::Double => {
                         let current_frame = access_macros::current_frame_mut!(thread);
-                        locals[val_idx - 1] = VarValue::DoubleHighBytes;
-                        val_idx -= 1;
+                        locals[locals_idx] = VarValue::DoubleHighBytes;
+                        locals_idx -= 1;
                         let val = match current_frame.op_stack.pop() {
                             Some(v) => v,
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_double(val)?;
-                        locals[val_idx - 1] = VarValue::Double(inner_value);
+                        locals[locals_idx] = VarValue::Double(inner_value);
                     },
                     ValueMarker::Float => {
                         let current_frame = access_macros::current_frame_mut!(thread);
@@ -248,7 +251,7 @@ impl Class for CustomClass {
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_float(val)?;
-                        locals[val_idx - 1] = VarValue::Float(inner_value);
+                        locals[locals_idx] = VarValue::Float(inner_value);
                     },
                     ValueMarker::Int => {
                         let current_frame = access_macros::current_frame_mut!(thread);
@@ -257,19 +260,19 @@ impl Class for CustomClass {
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_int(val)?;
-                        locals[val_idx - 1] = VarValue::Int(inner_value);
+                        locals[locals_idx] = VarValue::Int(inner_value);
                         
                     },
                     ValueMarker::Long => {
                         let current_frame = access_macros::current_frame_mut!(thread);
-                        locals[val_idx - 1] = VarValue::LongHighBytes;
-                        val_idx -=  1;
+                        locals[locals_idx] = VarValue::LongHighBytes;
+                        locals_idx -= 1;
                         let val = match current_frame.op_stack.pop() {
                             Some(v) => v,
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_long(val)?;
-                        locals[val_idx - 1] = VarValue::Long(inner_value);
+                        locals[locals_idx] = VarValue::Long(inner_value);
                     },
                     ValueMarker::Short => {
                         let current_frame = access_macros::current_frame_mut!(thread);
@@ -278,7 +281,7 @@ impl Class for CustomClass {
                             None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                         };
                         let inner_value = Value::to_int(val)?;
-                        locals[val_idx - 1] = VarValue::Short(inner_value);
+                        locals[locals_idx] = VarValue::Short(inner_value);
                     },
                     ValueMarker::Reference => {            
                         let val = {
@@ -302,7 +305,7 @@ impl Class for CustomClass {
                             }
                         };
                         let inner_value = Value::to_reference(val)?;
-                        locals[val_idx - 1] = VarValue::Reference(inner_value);
+                        locals[locals_idx] = VarValue::Reference(inner_value);
                     }
                     ValueMarker::Void => {
                         panic!("There shouldn't be void types in arguments");
@@ -311,9 +314,10 @@ impl Class for CustomClass {
                         panic!("We shouldn't read top type");
                     },
                 }
-                val_idx -= 1;
-            }  
+                locals_idx -= 1;
+            }
         }
+        
         /* 
         print!("Local types for static execution: [");
         for ty in &*local_types {
@@ -375,7 +379,7 @@ impl CustomClass {
         let c_file = self.get_class_file();
         let mut fname = String::from(c_file.cp_entry(method.name_index).unwrap().as_utf8().unwrap());
         fname.push_str(c_file.cp_entry(method.descriptor_index).unwrap().as_utf8().unwrap());
-        let (args, ret) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index).
+        let (args, ret, _real_num_locals) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index).
             unwrap().as_utf8().unwrap()).unwrap();
         let fn_type = ret.llvm_type(self.context).fn_type(
             args.into_iter()

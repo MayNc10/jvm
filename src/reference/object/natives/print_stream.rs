@@ -27,6 +27,7 @@ impl PrintStreamInner {
         Ok(())
     } 
     pub fn print_double(&self, d: &f64) -> Result<(), Error> {
+        //println!("Printing double with value {}", d);
         let d = *d;
         if d == d.round() {
             match self {
@@ -84,39 +85,55 @@ impl Object for PrintStream {
     fn put_field(&mut self, _current_method_class: Rc<dyn Class>, _class_index: u16, _jvm: &mut JVM, _value: Value<dyn Class, dyn Object>) -> Result<(), Error> {
         Err(Error::Todo(Opcode::NativeMethod))
     }
-    fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
+    fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) 
+    -> Result<bool, Error> {
         let cm_class_file = current_method_class.get_class_file();
         let name = cm_class_file.cp_entry(method.name_index)?.as_utf8()?.as_str();
         let desc = cm_class_file.cp_entry(method.descriptor_index)?.as_utf8()?.as_str();
         let thread = access_macros::current_thread_mut!(jvm);
         let frame: &mut Frame = access_macros::current_frame_mut!(thread);
+        let mut popped_self = false;
         let mut was_natively_executed = true;
         match (name, desc) {
-            ("println", "(Ljava/lang/String;)V") => {
-                self.inner.println(frame.op_stack.pop().unwrap().as_reference()?.as_object().unwrap().as_any().downcast_ref::<natives::string::String>().unwrap())?;
-            },
             ("print", "(Ljava/lang/String;)V") => {
                 self.inner.print(frame.op_stack.pop().unwrap().as_reference()?.as_object().unwrap().as_any().downcast_ref::<natives::string::String>().unwrap())?;
             },
             ("print", "(D)V") => {
                 self.inner.print_double(frame.op_stack.pop().unwrap().as_double()?)?;
-            },
-            ("println", "(D)V") => {
-                self.inner.print_double(frame.op_stack.pop().unwrap().as_double()?)?;
-                self.inner.newline()?;
-            },
+            },  
             ("print", "(I)V") => {
                 self.inner.print_int(frame.op_stack.pop().unwrap().as_int()?)?;
+            },
+            ("println", "(Ljava/lang/String;)V") => {
+                self.inner.println(frame.op_stack.pop().unwrap().as_reference()?.as_object().unwrap().as_any().downcast_ref::<natives::string::String>().unwrap())?;
             },
             ("println", "(I)V") => {
                 self.inner.print_int(frame.op_stack.pop().unwrap().as_int()?)?;
                 self.inner.newline()?;
             },
+            ("println", "(D)V") => {
+                self.inner.print_double(frame.op_stack.pop().unwrap().as_double()?)?;
+                self.inner.newline()?;
+            },
+            ("println", "()V") => {
+                self.inner.newline()?;
+            },
+            
+            
             _ => {
                 // do funky stuff
-                eprintln!("Error: unrecognized function on printstream {name}{desc}");
+                eprintln!("{}", format!("Use of unimplemented function: {name}{desc} in class PrintStream").red());
+                if &desc[desc.len() - 1..] != "V" {
+                    // expected to push something onto stack
+                    frame.op_stack.push(Value::Reference(Reference::Null));
+                }
                 was_natively_executed = false;
             }
+        }
+        if !popped_self {
+            let thread = access_macros::current_thread_mut!(jvm);
+            let frame: &mut Frame = access_macros::current_frame_mut!(thread);
+            frame.op_stack.pop();
         }
         Ok(was_natively_executed)
     }

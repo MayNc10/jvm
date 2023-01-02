@@ -6,6 +6,8 @@
 #![feature(downcast_unchecked)] // Used for downcasting to native objects.
 #![feature(allocator_api, ptr_internals)]
 #![feature(vec_into_raw_parts)]
+#![feature(int_roundings)]
+#![feature(float_next_up_down)]
 
 #[macro_use] pub mod access_macros;
 pub mod argsparser;

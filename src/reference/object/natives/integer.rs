@@ -20,12 +20,14 @@ impl Object for Integer {
     fn put_field(&mut self, _current_method_class: Rc<dyn Class>, _class_index: u16, _jvm: &mut JVM, _value: Value<dyn Class, dyn Object>) -> Result<(), Error> {
         Err(Error::NoSuchFieldError(Opcode::PUTFIELD))
     }
-    fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
+    fn exec_method(&mut self, current_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) 
+    -> Result<bool, Error> {
         let cm_class_file = current_method_class.get_class_file();
         let name = cm_class_file.cp_entry(method.name_index)?.as_utf8()?;
         let desc = cm_class_file.cp_entry(method.descriptor_index)?.as_utf8()?;
         let thread = access_macros::current_thread_mut!(jvm);
         let frame: &mut Frame = access_macros::current_frame_mut!(thread);
+        let mut popped_self = false;
         let mut was_natively_executed = true;
         match (name.as_str(), desc.as_str()) {
             ("<init>", "(I)V") => {
@@ -54,8 +56,18 @@ impl Object for Integer {
             },
             _ => {
                 // do funky stuff
+                eprintln!("{}", format!("Use of unimplemented function: {name}{desc} in class Integer").red());
+                if &desc[desc.len() - 1..] != "V" {
+                    // expected to push something onto stack
+                    frame.op_stack.push(Value::Reference(Reference::Null));
+                }
                 was_natively_executed = false;
             }
+        }
+        if !popped_self {
+            let thread = access_macros::current_thread_mut!(jvm);
+            let frame: &mut Frame = access_macros::current_frame_mut!(thread);
+            frame.op_stack.pop();
         }
         Ok(was_natively_executed)
     }

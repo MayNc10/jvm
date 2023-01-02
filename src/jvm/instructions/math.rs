@@ -995,7 +995,7 @@ impl Instruction for LShl {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::LSHL)),
         };
-        let result = val1.as_long()? << (val2.as_long()? & 0x3f);
+        let result = val1.as_long()? << (val2.as_int()? & 0x3f);
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
@@ -1073,7 +1073,7 @@ impl Instruction for LShr {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::LSHR)),
         };
-        let result = val1.as_long()? >> (val2.as_long()? & 0x3f);
+        let result = val1.as_long()? >> (val2.as_int()? & 0x3f);
         frame.op_stack.push(Value::Long(result));
         Ok(())
     }
@@ -1156,11 +1156,11 @@ impl Instruction for LUshr {
             Some(v) => v,
             None => return Err(Error::StackUnderflow(Opcode::LUSHR)),
         };
-        let mut result = val1.as_long()? >> (val2.as_long()? & 0x3f);
+        let mut result = val1.as_long()? >> (val2.as_int()? & 0x3f);
         if *val1.as_long()? < 0 {
             // Account for propagated sign bit.
             // See: https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-6.html#jvms-6.5.fadd
-            result += 2 << !(val2.as_long()? & 0x3f);
+            result += 2 << !(val2.as_int()? & 0x3f);
         }
         frame.op_stack.push(Value::Long(result));
         Ok(())

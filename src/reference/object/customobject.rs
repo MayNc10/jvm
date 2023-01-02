@@ -9,6 +9,7 @@ use crate::errorcodes::{Error, Opcode};
 use crate::frame::Frame;
 use crate::jvm::JVM;
 use crate::multitypebox::MultiTypeBox;
+use crate::reference::Reference;
 use crate::reference::array::Array;
 use super::object::Object;
 use crate::llvm::valuemarker::ValueMarker;
@@ -205,21 +206,21 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
             None => Err(Error::NoSuchFieldError(Opcode::PUTFIELD)),
         }
     }
-    fn exec_method(&mut self, new_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) -> Result<bool, Error> {
+    fn exec_method(&mut self, new_method_class: Rc<dyn Class>, jvm: &mut JVM, method: &MethodInfo) 
+    -> Result<bool, Error> {
         let thread = current_thread_mut!(jvm);
         // Fill out the local variables.
         let c_file = new_method_class.get_class_file();
         // Use jvm::parse_descriptor
-        let (local_types, _) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index)?.as_utf8()?)?;
+        let (local_types, _, real_max_locals) = JVM::parse_descriptor(c_file.cp_entry(method.descriptor_index)?.as_utf8()?)?;
         let mut new_frame = Frame::new_with_stack_size(new_method_class.as_dyn_rc(), method.clone(), 
             method.code.as_ref().unwrap().max_locals.into(),
             method.code.as_ref().unwrap().max_stack.into()); // Should take into account implicit 'this'.
         let locals = &mut new_frame.local_variables; 
         // Account for implicit 'this'
-        let mut val_idx: usize = local_types.len(); 
-
-        while val_idx > 0 {
-            let val = local_types[val_idx - 1];
+       
+        let mut locals_idx = real_max_locals ;
+        for val in local_types.iter().rev() {
             match val {
                 ValueMarker::Byte => {
                     let current_frame = current_frame_mut!(thread);
@@ -228,7 +229,7 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
                         None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                     };
                     let inner_value = Value::to_int(val)?;
-                    locals[val_idx] = VarValue::Byte(inner_value);
+                    locals[locals_idx] = VarValue::Byte(inner_value);
                 },
                 ValueMarker::Char => {
                     let current_frame = current_frame_mut!(thread);
@@ -237,18 +238,18 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
                         None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                     };
                     let inner_value = Value::to_int(val)?;
-                    locals[val_idx] = VarValue::Char(inner_value);
+                    locals[locals_idx] = VarValue::Char(inner_value);
                 },
                 ValueMarker::Double => {
                     let current_frame = current_frame_mut!(thread);
-                    locals[val_idx] = VarValue::DoubleHighBytes;
-                    val_idx -= 1;
+                    locals[locals_idx] = VarValue::DoubleHighBytes;
+                    locals_idx -= 1;
                     let val = match current_frame.op_stack.pop() {
                         Some(v) => v,
                         None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                     };
                     let inner_value = Value::to_double(val)?;
-                    locals[val_idx] = VarValue::Double(inner_value);
+                    locals[locals_idx] = VarValue::Double(inner_value);
                 },
                 ValueMarker::Float => {
                     let current_frame = current_frame_mut!(thread);
@@ -257,7 +258,7 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
                         None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                     };
                     let inner_value = Value::to_float(val)?;
-                    locals[val_idx] = VarValue::Float(inner_value);
+                    locals[locals_idx] = VarValue::Float(inner_value);
                 },
                 ValueMarker::Int => {
                     let current_frame = current_frame_mut!(thread);
@@ -266,19 +267,19 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
                         None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                     };
                     let inner_value = Value::to_int(val)?;
-                    locals[val_idx] = VarValue::Int(inner_value);
+                    locals[locals_idx] = VarValue::Int(inner_value);
                     
                 },
                 ValueMarker::Long => {
                     let current_frame = current_frame_mut!(thread);
-                    locals[val_idx] = VarValue::LongHighBytes;
-                    val_idx -=  1;
+                    locals[locals_idx] = VarValue::LongHighBytes;
+                    locals_idx -= 1;
                     let val = match current_frame.op_stack.pop() {
                         Some(v) => v,
                         None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                     };
                     let inner_value = Value::to_long(val)?;
-                    locals[val_idx] = VarValue::Long(inner_value);
+                    locals[locals_idx] = VarValue::Long(inner_value);
                 },
                 ValueMarker::Short => {
                     let current_frame = current_frame_mut!(thread);
@@ -287,17 +288,19 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
                         None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
                     };
                     let inner_value = Value::to_int(val)?;
-                    locals[val_idx] = VarValue::Short(inner_value);
+                    locals[locals_idx] = VarValue::Short(inner_value);
                 },
-                ValueMarker::Reference => { 
-                    let current_frame = current_frame_mut!(thread);     
-                    // We could check the class type and make sure it matches up with the expected type, but that's not required by the JVM Spec, so for now we won't       
-                    let val = match current_frame.op_stack.pop() {   
-                                Some(v) => v,
-                                None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                ValueMarker::Reference => {            
+                    let val = {
+                        let current_frame = current_frame_mut!(thread);
+                        // We could check the class type and make sure it matches up with the expected type, but that's not required by the JVM Spec, so for now we won't
+                        match current_frame.op_stack.pop() {
+                            Some(v) => v,
+                            None => return Err(Error::StackUnderflow(Opcode::MethodInvoke)),
+                        }
                     };
                     let inner_value = Value::to_reference(val)?;
-                    locals[val_idx] = VarValue::Reference(inner_value);
+                    locals[locals_idx] = VarValue::Reference(inner_value);
                 }
                 ValueMarker::Void => {
                     panic!("There shouldn't be void types in arguments");
@@ -306,8 +309,10 @@ impl<C: Class + ?Sized + 'static> Object for CustomObject<C> {
                     panic!("We shouldn't read top type");
                 },
             }
-            val_idx -= 1;
-        }  
+            locals_idx -= 1;
+        }
+
+       
         let current_frame = current_frame_mut!(thread);
         let objectref = match current_frame.op_stack.pop() {
             Some(v) => v,

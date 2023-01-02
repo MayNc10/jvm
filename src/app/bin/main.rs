@@ -1,3 +1,6 @@
+#[cfg(target_family = "wasm")]
+mod app {
+
 use std::collections::HashMap;
 use std::iter::zip;
 
@@ -331,6 +334,13 @@ impl App {
     }
 }
 
+}
+
+#[cfg(target_family = "wasm")]
 fn main() {
+    use crate::app::App;
     yew::Renderer::<App>::new().render();
 }
+
+#[cfg(not(target_family = "wasm"))] 
+fn main() {}

@@ -136,7 +136,7 @@ pub struct LocalVar {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Argument {
     offset: u16,
-    type_arguement_index: u8,
+    type_argument_index: u8,
 }
 
 #[derive(Clone, Debug, PartialEq)]

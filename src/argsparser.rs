@@ -58,7 +58,7 @@ pub fn parse_args(args: &[String]) -> Result<Cli, ParseError> {
     if args.contains(&String::from("--access-control")) {
         flags |= jvm::settings::SHOULD_CONTROL_ACCESS;
     }
-    if args.contains(&String::from("-v")) {
+    if args.contains(&String::from("-vf")) {
         flags |= jvm::settings::SHOULD_VERIFY;
     }
     if args.contains(&String::from("--verify")) {
@@ -70,7 +70,7 @@ pub fn parse_args(args: &[String]) -> Result<Cli, ParseError> {
     if args.contains(&String::from("--dump-backtrace")) {
         flags |= jvm::settings::SHOULD_BACKTRACE;
     }
-    if args.contains(&String::from("-v")) {
+    if args.contains(&String::from("-vb")) {
         verbose = true;
     }
     if args.contains(&String::from("--verbose")) {
@@ -103,7 +103,7 @@ pub fn parse_args(args: &[String]) -> Result<Cli, ParseError> {
             missing_file = true;
         }
         else {
-            missing_file = &fname[(fname.len() - 6)..] != ".jar"
+            missing_file = &fname[(fname.len() - 4)..] != ".jar"
         }
         
     }
